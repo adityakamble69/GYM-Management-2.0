@@ -126,7 +126,7 @@ export default function Login({ onLogin }) {
               </div>
               <div>
                 <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "20px", color: "var(--text-primary)", letterSpacing: "0.01em" }}>
-                  GymPro
+                  Workout World Gym
                 </div>
                 <div style={{ fontSize: "10px", color: "var(--accent-bright)", letterSpacing: "0.12em", opacity: 0.8 }}>
                   MANAGEMENT SYSTEM

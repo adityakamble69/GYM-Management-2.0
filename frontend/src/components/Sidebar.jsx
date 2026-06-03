@@ -49,7 +49,7 @@ export default function Sidebar({ onLogout }) {
           <span style={{
             fontFamily: "var(--font-display)", fontWeight: 800,
             fontSize: "16px", color: "var(--text-primary)", letterSpacing: "0.02em"
-          }}>GymPro</span>
+          }}>Workout World Gym</span>
         </div>
       </div>
 
