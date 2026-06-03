@@ -4,6 +4,7 @@ import {
   FaMoneyBill, FaTools, FaChartBar, FaSignOutAlt, FaBolt,
   FaUserCircle
 } from "react-icons/fa";
+import { FaIdCard } from "react-icons/fa"; // top pe add karo existing import mein
 
 const NAV = [
   { icon: FaHome,            label: "Dashboard",  path: "/dashboard"  },
@@ -11,6 +12,7 @@ const NAV = [
   { icon: FaUserTie,         label: "Trainers",   path: "/trainers"   },
   { icon: FaClipboardCheck,  label: "Attendance", path: "/attendance" },
   { icon: FaMoneyBill,       label: "Payments",   path: "/payments"   },
+  { icon: FaIdCard, label: "Membership Plans", path: "/membership-plans" },
   { icon: FaTools,           label: "Equipment",  path: "/equipment"  },
   { icon: FaChartBar,        label: "Reports",    path: "/reports"    },
   { icon: FaUserCircle,      label: "Profile",    path: "/profile"    },

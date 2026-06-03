@@ -10,6 +10,7 @@ import Equipment   from "./pages/Equipment";
 import Notifications from "./pages/Notifications";
 import Reports     from "./pages/Reports";
 import Profile     from "./pages/Profile";
+import MembershipPlans from "./pages/MembershipPlans";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
@@ -38,6 +39,7 @@ function App() {
         <Route path="/attendance"    element={<Attendance     onLogout={handleLogout} />} />
         <Route path="/trainers"      element={<Trainers       onLogout={handleLogout} />} />
         <Route path="/payments"      element={<Payments       onLogout={handleLogout} />} />
+        <Route path="/membership-plans" element={<MembershipPlans onLogout={handleLogout} />} />
         <Route path="/equipment"     element={<Equipment      onLogout={handleLogout} />} />
         <Route path="/notifications" element={<Notifications  onLogout={handleLogout} />} />
         <Route path="/reports"       element={<Reports        onLogout={handleLogout} />} />
