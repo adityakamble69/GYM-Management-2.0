@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Core Palette */
+  --bg-base:        #0a0a0a;
+  --bg-surface:     #111111;
+  --bg-elevated:    #1a1a1a;
+  --bg-hover:       #222222;
+  --bg-active:      #2a2a2a;
+
+  /* Borders */
+  --border-subtle:  #1f1f1f;
+  --border-default: #2a2a2a;
+  --border-strong:  #3a3a3a;
+
+  /* Text */
+  --text-primary:   #f0f0f0;
+  --text-secondary: #a0a0a0;
+  --text-muted:     #555555;
+  --text-disabled:  #333333;
+
+  /* Accent — sharp white/silver */
+  --accent:         #e0e0e0;
+  --accent-bright:  #ffffff;
+  --accent-dim:     #606060;
+
+  /* Semantic */
+  --green:          #4ade80;
+  --green-bg:       rgba(74,222,128,0.08);
+  --red:            #f87171;
+  --red-bg:         rgba(248,113,113,0.08);
+  --yellow:         #fbbf24;
+  --yellow-bg:      rgba(251,191,36,0.08);
+  --blue:           #60a5fa;
+  --blue-bg:        rgba(96,165,250,0.08);
+
+  /* Typography */
+  --font-display:   'Syne', sans-serif;
+  --font-body:      'DM Sans', sans-serif;
+
+  /* Radius */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.5);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.6);
+  --shadow-lg:  0 12px 40px rgba(0,0,0,0.8);
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }
+
+/* Inputs global reset */
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+button { font-family: var(--font-body); }
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.fade-up  { animation: fadeUp 0.35s ease forwards; }
+.fade-in  { animation: fadeIn 0.25s ease forwards; }
+
+.stagger-1 { animation-delay: 0.05s; opacity: 0; }
+.stagger-2 { animation-delay: 0.10s; opacity: 0; }
+.stagger-3 { animation-delay: 0.15s; opacity: 0; }
+.stagger-4 { animation-delay: 0.20s; opacity: 0; }
