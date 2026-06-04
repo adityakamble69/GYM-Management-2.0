@@ -9,16 +9,16 @@ import {
   FaMoneyBill, FaPlus, FaSearch, FaEdit, FaTrash,
   FaChevronLeft, FaChevronRight, FaTimes, FaCheck,
   FaClock, FaArrowUp, FaArrowDown, FaCalendarAlt,
-  FaFilter, FaRupeeSign, FaHistory
+  FaFilter, FaRupeeSign, FaHistory, FaExclamationTriangle
 } from "react-icons/fa";
 
 const fmt     = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 
 const STATUS_COLOR = {
-  paid:     { color: "var(--green)",  bg: "var(--green-bg)" },
+  paid:     { color: "var(--green)",  bg: "var(--green-bg)"  },
   pending:  { color: "var(--yellow)", bg: "var(--yellow-bg)" },
-  failed:   { color: "var(--red)",    bg: "var(--red-bg)" },
+  failed:   { color: "var(--red)",    bg: "var(--red-bg)"    },
   refunded: { color: "#888",          bg: "rgba(136,136,136,0.1)" },
 };
 const METHOD_ICON = { cash: "💵", card: "💳", upi: "📱", bank_transfer: "🏦" };
@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-// ─── Helper: group plans by duration_type ──────────────────────────────────────
+// ─── Helper: group plans by duration_type ─────────────────────────────────────
 const TYPE_LABEL = { monthly: "Monthly Plans", quarterly: "Quarterly Plans", yearly: "Yearly Plans" };
 
 function PlanSelect({ value, onChange, plans, style, includeOther = true }) {
@@ -91,9 +91,13 @@ function PlanSelect({ value, onChange, plans, style, includeOther = true }) {
 function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
   const today = new Date().toISOString().split("T")[0];
   const empty = {
-    member_id: "", amount: "", payment_date: today,
-    payment_method: "cash", payment_for: "", status: "paid",
-    months_covered: 1, notes: ""
+    member_id: "", amount: "", paid_amount: "",
+    payment_date: today,
+    payment_method: "cash",
+    payment_for: "",   // stores plan name OR enum value (registration/other)
+    status: "paid",
+    months_covered: 1, notes: "",
+    plan_start: "", plan_end: ""
   };
   const [form,   setForm]   = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -101,31 +105,47 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
 
   useEffect(() => {
     if (editData) {
+      // For edit: payment_for may be enum value; plan_name is the display name
       setForm({
         member_id:      editData.member_id      || "",
         amount:         editData.amount         || "",
+        paid_amount:    editData.paid_amount     || "",
         payment_date:   editData.payment_date?.split("T")[0] || today,
         payment_method: editData.payment_method || "cash",
-        payment_for:    editData.payment_for    || "",
+        // show plan_name in dropdown if available, else payment_for
+        payment_for:    editData.plan_name      || editData.payment_for || "",
         status:         editData.status         || "paid",
         months_covered: editData.months_covered || 1,
-        notes:          editData.notes          || ""
+        notes:          editData.notes          || "",
+        plan_start:     editData.plan_start?.split("T")[0] || "",
+        plan_end:       editData.plan_end?.split("T")[0]   || "",
       });
-    } else { setForm(empty); }
+    } else {
+      setForm(empty);
+    }
     setError("");
   }, [editData, isOpen]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // When plan selected → auto-fill amount
+  // When plan selected → auto-fill amount, dates, months
   const handlePlanSelect = (planName) => {
     set("payment_for", planName);
     const plan = plans.find(p => p.name === planName);
     if (plan) {
       set("amount", plan.price);
-      // auto months_covered from duration_type
       const monthsMap = { monthly: 1, quarterly: 3, yearly: 12 };
       set("months_covered", monthsMap[plan.duration_type] || 1);
+      // Auto-calculate plan dates
+      const start = new Date();
+      const end   = new Date();
+      end.setDate(end.getDate() + plan.duration_days);
+      set("plan_start", start.toISOString().split("T")[0]);
+      set("plan_end",   end.toISOString().split("T")[0]);
+    } else {
+      // registration / other — clear plan dates
+      set("plan_start", "");
+      set("plan_end",   "");
     }
   };
 
@@ -134,7 +154,31 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
       setError("Member, amount and date are required"); return;
     }
     setSaving(true); setError("");
-    try { await onSave(form); onClose(); }
+    try {
+      // ── BUG FIX: payment_for must be enum value, not plan display name ──────
+      const selectedPlan = plans.find(p => p.name === form.payment_for);
+
+      const payload = {
+        ...form,
+        paid_amount: form.paid_amount || form.amount,
+
+        // payment_for → send enum value (monthly/quarterly/yearly/registration/other)
+        payment_for: selectedPlan
+          ? selectedPlan.duration_type          // "monthly" | "quarterly" | "yearly"
+          : (form.payment_for || "other"),      // "registration" | "other"
+
+        // plan_name → send display name separately for storage
+        plan_name: selectedPlan
+          ? selectedPlan.name                   // "Basic Monthly", "Premium Yearly" etc.
+          : null,
+
+        plan_start: form.plan_start || null,
+        plan_end:   form.plan_end   || null,
+      };
+
+      await onSave(payload);
+      onClose();
+    }
     catch (e) { setError(e.response?.data?.message || "Save failed"); }
     finally { setSaving(false); }
   };
@@ -153,8 +197,11 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
     textTransform: "uppercase", letterSpacing: "0.08em"
   };
 
-  // Find selected plan for preview
   const selectedPlan = plans.find(p => p.name === form.payment_for);
+  const dueAmount    = form.amount && form.paid_amount
+    ? Math.max(0, Number(form.amount) - Number(form.paid_amount))
+    : 0;
+  const isPartial    = dueAmount > 0;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
@@ -183,6 +230,7 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
           )}
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+
             {/* Member */}
             <div style={{ gridColumn: "1/-1" }}>
               <label style={lbl}>Member *</label>
@@ -194,7 +242,7 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
               </select>
             </div>
 
-            {/* Payment For — dynamic plans ── */}
+            {/* Payment For */}
             <div style={{ gridColumn: "1/-1" }}>
               <label style={lbl}>Payment For (Plan)</label>
               <PlanSelect
@@ -204,7 +252,6 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
                 style={inp}
                 includeOther={true}
               />
-              {/* Plan preview */}
               {selectedPlan && (
                 <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", display: "flex", gap: "20px", alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
@@ -220,11 +267,52 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
               )}
             </div>
 
-            {/* Amount */}
+            {/* Total Amount */}
             <div>
-              <label style={lbl}>Amount (₹) *</label>
+              <label style={lbl}>Total Amount (₹) *</label>
               <input type="number" value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="999" style={inp} />
             </div>
+
+            {/* Paid Amount */}
+            <div>
+              <label style={lbl}>Paid Amount (₹)</label>
+              <input
+                type="number"
+                value={form.paid_amount}
+                onChange={e => set("paid_amount", e.target.value)}
+                placeholder="Leave blank = full paid"
+                style={{
+                  ...inp,
+                  borderColor: isPartial ? "rgba(234,179,8,0.5)" : "var(--border-default)"
+                }}
+              />
+            </div>
+
+            {/* Due Amount Banner */}
+            {isPartial && (
+              <div style={{ gridColumn: "1/-1" }}>
+                <div style={{
+                  padding: "10px 14px", borderRadius: "var(--radius-sm)",
+                  background: "var(--yellow-bg)", border: "1px solid rgba(234,179,8,0.3)",
+                  display: "flex", justifyContent: "space-between", alignItems: "center"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <FaExclamationTriangle style={{ color: "var(--yellow)", fontSize: "13px" }} />
+                    <span style={{ fontSize: "13px", color: "var(--yellow)", fontWeight: 600 }}>
+                      Partial Payment
+                    </span>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--yellow)" }}>
+                      Due: {fmt(dueAmount)}
+                    </div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
+                      Status will be set to Pending
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Payment Date */}
             <div>
@@ -246,7 +334,7 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
             {/* Status */}
             <div>
               <label style={lbl}>Status</label>
-              <select value={form.status} onChange={e => set("status", e.target.value)} style={inp}>
+              <select value={isPartial ? "pending" : form.status} onChange={e => set("status", e.target.value)} style={inp} disabled={isPartial}>
                 <option value="paid">✅ Paid</option>
                 <option value="pending">⏳ Pending</option>
                 <option value="failed">❌ Failed</option>
@@ -259,6 +347,20 @@ function PaymentModal({ isOpen, onClose, onSave, editData, members, plans }) {
               <label style={lbl}>Months Covered</label>
               <input type="number" min="1" max="12" value={form.months_covered} onChange={e => set("months_covered", e.target.value)} style={inp} />
             </div>
+
+            {/* Plan Start / End (shown when plan selected) */}
+            {selectedPlan && (
+              <>
+                <div>
+                  <label style={lbl}>Plan Start Date</label>
+                  <input type="date" value={form.plan_start} onChange={e => set("plan_start", e.target.value)} style={inp} />
+                </div>
+                <div>
+                  <label style={lbl}>Plan End Date</label>
+                  <input type="date" value={form.plan_end} onChange={e => set("plan_end", e.target.value)} style={inp} />
+                </div>
+              </>
+            )}
 
             {/* Notes */}
             <div style={{ gridColumn: "1/-1" }}>
@@ -312,7 +414,6 @@ function PlanHistoryModal({ member, onClose, plans }) {
     setLoading(false);
   };
 
-  // When plan selected in Add form → auto-fill amount + end date
   const handleAddPlanSelect = (planName) => {
     setForm(f => {
       const plan = plans.find(p => p.name === planName);
@@ -329,7 +430,6 @@ function PlanHistoryModal({ member, onClose, plans }) {
     });
   };
 
-  // When start date changes → recalc end date if plan is selected
   const handleStartDateChange = (dateVal) => {
     setForm(f => {
       const plan = plans.find(p => p.name === f.plan_name);
@@ -421,17 +521,9 @@ function PlanHistoryModal({ member, onClose, plans }) {
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-              {/* Plan Name — dynamic */}
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Plan *</label>
-                <PlanSelect
-                  value={form.plan_name}
-                  onChange={e => handleAddPlanSelect(e.target.value)}
-                  plans={plans}
-                  style={inp}
-                  includeOther={false}
-                />
-                {/* Plan selected preview */}
+                <PlanSelect value={form.plan_name} onChange={e => handleAddPlanSelect(e.target.value)} plans={plans} style={inp} includeOther={false} />
                 {form.plan_name && (() => {
                   const p = plans.find(pl => pl.name === form.plan_name);
                   if (!p) return null;
@@ -442,7 +534,6 @@ function PlanHistoryModal({ member, onClose, plans }) {
                   );
                 })()}
               </div>
-
               <div>
                 <label style={{ display: "block", fontSize: "10px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "4px" }}>Start Date *</label>
                 <input type="date" value={form.plan_start} onChange={e => handleStartDateChange(e.target.value)} style={inp} />
@@ -471,7 +562,6 @@ function PlanHistoryModal({ member, onClose, plans }) {
           </div>
         )}
 
-        {/* Message */}
         {msg && !showAdd && (
           <div style={{ padding: "8px 24px", background: msg.startsWith("✅") ? "var(--green-bg)" : "var(--red-bg)", color: msg.startsWith("✅") ? "var(--green)" : "var(--red)", fontSize: "12px" }}>
             {msg}
@@ -506,13 +596,7 @@ function PlanHistoryModal({ member, onClose, plans }) {
                     return (
                       <tr key={h.id} style={{ background: "var(--bg-elevated)", borderBottom: "1px solid var(--border-subtle)" }}>
                         <td style={{ padding: "8px 12px" }}>
-                          <PlanSelect
-                            value={editRow.plan_name}
-                            onChange={e => setEditRow(r => ({ ...r, plan_name: e.target.value }))}
-                            plans={plans}
-                            style={{ ...inp, fontSize: "12px" }}
-                            includeOther={false}
-                          />
+                          <PlanSelect value={editRow.plan_name} onChange={e => setEditRow(r => ({ ...r, plan_name: e.target.value }))} plans={plans} style={{ ...inp, fontSize: "12px" }} includeOther={false} />
                         </td>
                         <td style={{ padding: "8px 12px" }}>
                           <input type="date" value={editRow.plan_start?.split("T")[0]} onChange={e => setEditRow(r => ({ ...r, plan_start: e.target.value }))} style={{ ...inp, fontSize: "12px" }} />
@@ -608,7 +692,7 @@ function PlanHistoryModal({ member, onClose, plans }) {
 export default function Payments({ onLogout }) {
   const [payments, setPayments]   = useState([]);
   const [members,  setMembers]    = useState([]);
-  const [plans,    setPlans]      = useState([]);   // ← membership plans from DB
+  const [plans,    setPlans]      = useState([]);
   const [stats,    setStats]      = useState(null);
   const [loading,  setLoading]    = useState(true);
   const [search,   setSearch]     = useState("");
@@ -636,7 +720,6 @@ export default function Payments({ onLogout }) {
 
   const fetchStats   = async () => { try { const r = await api.get("/payments/stats/summary"); setStats(r.data.data); } catch (e) {} };
   const fetchMembers = async () => { try { const r = await api.get("/members", { params: { limit: 500 } }); setMembers(r.data.data); } catch (e) {} };
-  // ← Fetch active membership plans
   const fetchPlans   = async () => { try { const r = await api.get("/membership-plans?status=active"); setPlans(r.data.data || []); } catch (e) {} };
 
   useEffect(() => { fetchStats(); fetchMembers(); fetchPlans(); }, []);
@@ -657,7 +740,7 @@ export default function Payments({ onLogout }) {
     finally { setDeleting(null); }
   };
 
-  const trend    = stats ? (Number(stats.thisMonth) - Number(stats.lastMonth)) : undefined;
+  const trend     = stats ? (Number(stats.thisMonth) - Number(stats.lastMonth)) : undefined;
   const chartData = stats?.monthly6 || [];
 
   return (
@@ -681,10 +764,11 @@ export default function Payments({ onLogout }) {
 
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: "14px", marginBottom: "24px" }}>
-          <StatCard icon={FaRupeeSign}    color="var(--green)"  bg="var(--green-bg)"                    label="Total Revenue"    value={fmt(stats?.totalRevenue)} />
-          <StatCard icon={FaCalendarAlt}  color="var(--blue)"   bg="var(--blue-bg)"                     label="This Month"       value={fmt(stats?.thisMonth)} trend={trend} />
-          <StatCard icon={FaClock}        color="var(--yellow)" bg="var(--yellow-bg)"                   label="Pending Amount"   value={fmt(stats?.pendingAmount)} sub={`${stats?.pendingCount || 0} records`} />
-          <StatCard icon={FaCheck}        color="var(--accent)" bg="rgba(255,255,255,0.05)"              label="Today's Revenue"  value={fmt(stats?.todayRevenue)} />
+          <StatCard icon={FaRupeeSign}          color="var(--green)"  bg="var(--green-bg)"        label="Total Revenue"    value={fmt(stats?.totalRevenue)} />
+          <StatCard icon={FaCalendarAlt}         color="var(--blue)"   bg="var(--blue-bg)"         label="This Month"       value={fmt(stats?.thisMonth)} trend={trend} />
+          <StatCard icon={FaClock}               color="var(--yellow)" bg="var(--yellow-bg)"       label="Pending Amount"   value={fmt(stats?.pendingAmount)} sub={`${stats?.pendingCount || 0} records`} />
+          <StatCard icon={FaCheck}               color="var(--accent)" bg="rgba(255,255,255,0.05)" label="Today's Revenue"  value={fmt(stats?.todayRevenue)} />
+          <StatCard icon={FaExclamationTriangle} color="var(--yellow)" bg="var(--yellow-bg)"       label="Total Due Amount" value={fmt(stats?.totalDue)} sub="Partial payments" />
         </div>
 
         {/* Chart */}
@@ -741,7 +825,7 @@ export default function Payments({ onLogout }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
               <thead>
                 <tr style={{ background: "var(--bg-elevated)" }}>
-                  {["Member", "Amount", "Date", "Method", "For", "Months", "Status", "Actions"].map(h => (
+                  {["Member", "Amount / Due", "Date", "Method", "For", "Months", "Status", "Actions"].map(h => (
                     <th key={h} style={{ padding: "11px 16px", textAlign: "left", fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "1px solid var(--border-subtle)", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -766,13 +850,15 @@ export default function Payments({ onLogout }) {
                   </tr>
                 ) : (
                   payments.map(p => {
-                    const sc = STATUS_COLOR[p.status] || STATUS_COLOR.paid;
+                    const sc     = STATUS_COLOR[p.status] || STATUS_COLOR.paid;
+                    const hasDue = p.due_amount > 0;
                     return (
                       <tr key={p.id}
                         style={{ borderBottom: "1px solid var(--border-subtle)", transition: "background 0.1s" }}
                         onMouseEnter={e => e.currentTarget.style.background = "var(--bg-elevated)"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                       >
+                        {/* Member */}
                         <td style={{ padding: "14px 16px" }}>
                           <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{p.full_name}</div>
                           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{p.email}</div>
@@ -783,26 +869,53 @@ export default function Payments({ onLogout }) {
                             <FaCalendarAlt style={{ fontSize: "8px" }} /> Plan History
                           </button>
                         </td>
+
+                        {/* Amount / Due */}
                         <td style={{ padding: "14px 16px" }}>
-                          <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--text-primary)", fontSize: "14px" }}>{fmt(p.amount)}</span>
+                          <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--text-primary)", fontSize: "14px" }}>
+                            {fmt(p.amount)}
+                          </span>
+                          {hasDue && (
+                            <div style={{ marginTop: "5px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                              <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "var(--yellow-bg)", color: "var(--yellow)", border: "1px solid rgba(234,179,8,0.3)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                <FaExclamationTriangle style={{ fontSize: "8px" }} />
+                                Due: {fmt(p.due_amount)}
+                              </span>
+                              <span style={{ fontSize: "10px", color: "var(--text-muted)" }}>
+                                Paid: {fmt(p.paid_amount)}
+                              </span>
+                            </div>
+                          )}
                         </td>
+
+                        {/* Date */}
                         <td style={{ padding: "14px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{fmtDate(p.payment_date)}</td>
+
+                        {/* Method */}
                         <td style={{ padding: "14px 16px" }}>
                           <span style={{ display: "flex", alignItems: "center", gap: "5px", color: "var(--text-secondary)" }}>
                             {METHOD_ICON[p.payment_method]} {p.payment_method?.replace("_", " ")}
                           </span>
                         </td>
+
+                        {/* For — show plan_name if available, else payment_for */}
                         <td style={{ padding: "14px 16px" }}>
                           <span style={{ padding: "3px 8px", borderRadius: "99px", background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)", fontSize: "11px", color: "var(--text-secondary)", textTransform: "capitalize", whiteSpace: "nowrap" }}>
-                            {p.payment_for?.replace("_", " ")}
+                            {p.plan_name || p.payment_for?.replace("_", " ")}
                           </span>
                         </td>
+
+                        {/* Months */}
                         <td style={{ padding: "14px 16px", color: "var(--text-secondary)", textAlign: "center" }}>{p.months_covered}</td>
+
+                        {/* Status */}
                         <td style={{ padding: "14px 16px" }}>
                           <span style={{ padding: "4px 10px", borderRadius: "99px", background: sc.bg, color: sc.color, fontSize: "11px", fontWeight: 600, textTransform: "capitalize", whiteSpace: "nowrap" }}>
                             {p.status}
                           </span>
                         </td>
+
+                        {/* Actions */}
                         <td style={{ padding: "14px 16px" }}>
                           <div style={{ display: "flex", gap: "6px" }}>
                             <button
@@ -846,7 +959,7 @@ export default function Payments({ onLogout }) {
         </div>
       </main>
 
-      {/* ── Payment Modal — plans prop pass kiya ── */}
+      {/* Payment Modal */}
       <PaymentModal
         isOpen={showModal}
         onClose={() => setModal(false)}
@@ -856,7 +969,7 @@ export default function Payments({ onLogout }) {
         plans={plans}
       />
 
-      {/* ── Plan History Modal — plans prop pass kiya ── */}
+      {/* Plan History Modal */}
       <PlanHistoryModal
         member={planHistoryMember}
         onClose={() => setPlanHistoryMember(null)}

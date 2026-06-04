@@ -11,7 +11,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 403) {
+    // ── FIX: logout on both 401 (token expired) and 403 (forbidden) ──
+    if (err.response?.status === 401 || err.response?.status === 403) {
       localStorage.clear();
       window.location.href = "/";
     }

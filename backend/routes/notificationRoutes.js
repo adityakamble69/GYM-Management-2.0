@@ -1,14 +1,15 @@
 const express = require("express");
-const router  = express.Router();
-const db      = require("../config/db");
+const router = express.Router();
+const db = require("../config/db");
 const { verifyToken } = require("../middleware/authMiddleware");
 
 // ── AUTO-GENERATE notifications from live DB data ─────────────────────────────
 // Called internally — scans members, payments, equipment and creates fresh alerts
 function generateNotifications(callback) {
     const inserts = [];
-    let pending = 3;
+    let pending = 4; // 3 se 4 karo
     const done = () => { if (--pending === 0) callback(inserts); };
+
 
     // 1. Expired memberships
     db.query(
@@ -32,7 +33,7 @@ function generateNotifications(callback) {
          AND membership_end BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)`,
         (err, rows) => {
             if (!err) rows.forEach(r => {
-                const daysLeft = Math.ceil((new Date(r.membership_end) - new Date()) / (1000*60*60*24));
+                const daysLeft = Math.ceil((new Date(r.membership_end) - new Date()) / (1000 * 60 * 60 * 24));
                 inserts.push({
                     type: "membership_expiring",
                     title: "Membership Expiring Soon",
@@ -52,8 +53,8 @@ function generateNotifications(callback) {
          AND next_maintenance <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)`,
         (err, rows) => {
             if (!err) rows.forEach(r => {
-                const daysLeft = Math.ceil((new Date(r.next_maintenance) - new Date()) / (1000*60*60*24));
-                const overdue  = daysLeft < 0;
+                const daysLeft = Math.ceil((new Date(r.next_maintenance) - new Date()) / (1000 * 60 * 60 * 24));
+                const overdue = daysLeft < 0;
                 inserts.push({
                     type: "equipment_maintenance",
                     title: overdue ? "Maintenance Overdue" : "Maintenance Due Soon",
@@ -66,12 +67,29 @@ function generateNotifications(callback) {
             done();
         }
     );
+
+    // 4. NEW — Pending inquiries
+    db.query(
+        `SELECT id, full_name, created_at FROM inquiries 
+         WHERE status = 'pending'
+         ORDER BY created_at DESC`,
+        (err, rows) => {
+            if (!err) rows.forEach(r => inserts.push({
+                type: "inquiry",
+                title: "New Inquiry Received",
+                message: `${r.full_name} ne inquiry ki hai — reply pending hai`,
+                ref_id: r.id,
+                ref_type: "inquiry"
+            }));
+            done();
+        }
+    );
 }
 
 // ── GET ALL NOTIFICATIONS (paginated) ─────────────────────────────────────────
 router.get("/", verifyToken, (req, res) => {
-    const page   = parseInt(req.query.page)  || 1;
-    const limit  = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
     db.query("SELECT COUNT(*) AS total FROM notifications", (err, countRes) => {

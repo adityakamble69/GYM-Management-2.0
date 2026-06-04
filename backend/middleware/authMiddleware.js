@@ -13,7 +13,6 @@ const verifyToken = (req, res, next) => {
 };
 
 // ── RBAC: Require specific role(s) ───────────────────────────────────────────
-// Usage: requireRole("super_admin") or requireRole("super_admin","admin")
 const requireRole = (...roles) => (req, res, next) => {
     if (!req.admin) return res.status(401).json({ success: false, message: "Not authenticated" });
     if (!roles.includes(req.admin.role)) {

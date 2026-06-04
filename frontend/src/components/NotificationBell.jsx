@@ -6,33 +6,35 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import {
   FaBell, FaCheckDouble, FaTrash, FaChevronRight,
-  FaExclamationTriangle, FaClock, FaTools, FaMoneyBill, FaInfoCircle
+  FaExclamationTriangle, FaClock, FaTools, FaMoneyBill, FaInfoCircle, FaQuestionCircle
 } from "react-icons/fa";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const timeAgo = (dateStr) => {
   const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
-  if (diff < 60)   return "just now";
+  if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
+// TYPE_META object mein add karo
 const TYPE_META = {
-  membership_expired:  { icon: FaExclamationTriangle, color: "var(--red)",    bg: "var(--red-bg)"    },
-  membership_expiring: { icon: FaClock,               color: "var(--yellow)", bg: "var(--yellow-bg)" },
-  equipment_maintenance:{ icon: FaTools,              color: "var(--blue)",   bg: "var(--blue-bg)"   },
-  payment_pending:     { icon: FaMoneyBill,           color: "var(--green)",  bg: "var(--green-bg)"  },
-  general:             { icon: FaInfoCircle,          color: "#888",          bg: "rgba(136,136,136,0.1)" },
+  membership_expired: { icon: FaExclamationTriangle, color: "var(--red)", bg: "var(--red-bg)" },
+  membership_expiring: { icon: FaClock, color: "var(--yellow)", bg: "var(--yellow-bg)" },
+  equipment_maintenance: { icon: FaTools, color: "var(--blue)", bg: "var(--blue-bg)" },
+  payment_pending: { icon: FaMoneyBill, color: "var(--green)", bg: "var(--green-bg)" },
+  inquiry: { icon: FaQuestionCircle, color: "#a855f7", bg: "rgba(168,85,247,0.1)" }, // NEW
+  general: { icon: FaInfoCircle, color: "#888", bg: "rgba(136,136,136,0.1)" },
 };
 
 export default function NotificationBell() {
-  const navigate  = useNavigate();
-  const [open,         setOpen]         = useState(false);
-  const [notifications,setNotifs]       = useState([]);
-  const [unreadCount,  setUnread]       = useState(0);
-  const [loading,      setLoading]      = useState(false);
-  const [syncing,      setSyncing]      = useState(false);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifs] = useState([]);
+  const [unreadCount, setUnread] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const dropRef = useRef(null);
 
   // Close on outside click
