@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Join Our Gym — Inquiry Form</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #060910;
+      --surface:    #0d1117;
+      --elevated:   #161b22;
+      --border:     #21262d;
+      --border2:    #30363d;
+      --blue:       #2f81f7;
+      --blue-dim:   #1f6feb;
+      --blue-glow:  rgba(47,129,247,0.15);
+      --blue-faint: rgba(47,129,247,0.06);
+      --text:       #e6edf3;
+      --text2:      #8b949e;
+      --text3:      #484f58;
+      --green:      #3fb950;
+      --red:        #f85149;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    /* Background pattern */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(47,129,247,0.12), transparent),
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: var(--blue);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 20px rgba(47,129,247,0.4);
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+
+    h1 span { color: var(--blue); }
+
+    .subtitle {
+      color: var(--text2);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    }
+
+    /* Form */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .full { grid-column: 1 / -1; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input, select, textarea {
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      width: 100%;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--blue-dim);
+      box-shadow: 0 0 0 3px var(--blue-glow);
+    }
+
+    textarea { resize: vertical; min-height: 90px; }
+
+    select option { background: var(--elevated); }
+
+    /* Interest pills */
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .pill {
+      padding: 7px 16px;
+      border-radius: 99px;
+      border: 1px solid var(--border2);
+      background: var(--elevated);
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .pill:hover { border-color: var(--blue-dim); color: var(--blue); }
+
+    .pill.active {
+      background: var(--blue-faint);
+      border-color: var(--blue);
+      color: var(--blue);
+      font-weight: 600;
+    }
+
+    /* Submit */
+    .submit-btn {
+      width: 100%;
+      padding: 13px;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+      box-shadow: 0 4px 20px rgba(47,129,247,0.3);
+    }
+
+    .submit-btn:hover { background: var(--blue-dim); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(47,129,247,0.4); }
+    .submit-btn:disabled { background: var(--elevated); color: var(--text3); cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* Success / Error */
+    .alert {
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .alert.success { background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); color: var(--green); display: block; }
+    .alert.error   { background: rgba(248,81,73,0.1);  border: 1px solid rgba(248,81,73,0.3);  color: var(--red);   display: block; }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    /* Footer note */
+    .footer-note {
+      text-align: center;
+      color: var(--text3);
+      font-size: 12px;
+      margin-top: 20px;
+    }
+
+    @media (max-width: 500px) {
+      .grid { grid-template-columns: 1fr; }
+      .full { grid-column: 1; }
+      h1 { font-size: 26px; }
+      .card { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">GymPro</span>
+    </div>
+    <h1>Start Your <span>Fitness</span> Journey</h1>
+    <p class="subtitle">Fill out the form below and our team will<br/>get back to you within 24 hours.</p>
+  </div>
+
+  <!-- Card -->
+  <div class="card">
+    <form id="inquiryForm">
+      <div class="grid">
+
+        <!-- Full Name -->
+        <div class="field full">
+          <label>Full Name *</label>
+          <input type="text" id="full_name" placeholder="Enter your full name" required />
+        </div>
+
+        <!-- Email -->
+        <div class="field">
+          <label>Email Address *</label>
+          <input type="email" id="email" placeholder="you@example.com" required />
+        </div>
+
+        <!-- Phone -->
+        <div class="field">
+          <label>Phone Number *</label>
+          <input type="tel" id="phone" placeholder="9876543210" required />
+        </div>
+
+        <!-- Membership Interest -->
+        <div class="field full">
+          <label>Membership Interest</label>
+          <div class="pills">
+            <div class="pill active" data-val="not_sure"  onclick="selectPill(this,'interest')">Not Sure Yet</div>
+            <div class="pill"        data-val="basic"     onclick="selectPill(this,'interest')">Basic</div>
+            <div class="pill"        data-val="standard"  onclick="selectPill(this,'interest')">Standard</div>
+            <div class="pill"        data-val="premium"   onclick="selectPill(this,'interest')">Premium</div>
+          </div>
+          <input type="hidden" id="membership_interest" value="not_sure" />
+        </div>
+
+        <!-- Preferred Time -->
+        <div class="field full">
+          <label>Preferred Visit Time</label>
+          <div class="pills">
+            <div class="pill active" data-val="anytime"   onclick="selectPill(this,'time')">Anytime</div>
+            <div class="pill"        data-val="morning"   onclick="selectPill(this,'time')">🌅 Morning (6am–12pm)</div>
+            <div class="pill"        data-val="afternoon" onclick="selectPill(this,'time')">☀️ Afternoon (12pm–5pm)</div>
+            <div class="pill"        data-val="evening"   onclick="selectPill(this,'time')">🌆 Evening (5pm–10pm)</div>
+          </div>
+          <input type="hidden" id="preferred_time" value="anytime" />
+        </div>
+
+        <!-- Message -->
+        <div class="field full">
+          <label>Message / Questions</label>
+          <textarea id="message" placeholder="Tell us about your fitness goals, any questions..."></textarea>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">
+        SEND INQUIRY →
+      </button>
+
+      <div class="alert" id="alertBox"></div>
+    </form>
+  </div>
+
+  <p class="footer-note">🔒 Your information is safe with us. No spam, ever.</p>
+</div>
+
+<script>
+  // ── Pill selection ─────────────────────────────────────────────────────────
+  function selectPill(el, group) {
+    const parent = el.parentElement;
+    parent.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    if (group === 'interest') document.getElementById('membership_interest').value = el.dataset.val;
+    if (group === 'time')     document.getElementById('preferred_time').value      = el.dataset.val;
+  }
+
+  // ── Form Submit ────────────────────────────────────────────────────────────
+  document.getElementById('inquiryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const btn   = document.getElementById('submitBtn');
+    const alert = document.getElementById('alertBox');
+    alert.className = 'alert';
+    alert.textContent = '';
+
+    const data = {
+      full_name:           document.getElementById('full_name').value.trim(),
+      email:               document.getElementById('email').value.trim(),
+      phone:               document.getElementById('phone').value.trim(),
+      message:             document.getElementById('message').value.trim(),
+      membership_interest: document.getElementById('membership_interest').value,
+      preferred_time:      document.getElementById('preferred_time').value,
+    };
+
+    if (!data.full_name || !data.email || !data.phone) {
+      alert.className   = 'alert error';
+      alert.textContent = '⚠️ Please fill in all required fields.';
+      return;
+    }
+
+    btn.disabled     = true;
+    btn.textContent  = 'Sending...';
+
+    try {
+      const res  = await fetch('http://localhost:5000/api/inquiries/submit', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data)
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        alert.className   = 'alert success';
+        alert.textContent = '✅ Thank you! We will contact you within 24 hours.';
+        document.getElementById('inquiryForm').reset();
+        // Reset pills
+        document.querySelectorAll('.pills').forEach(g => {
+          g.querySelectorAll('.pill').forEach((p,i) => p.classList.toggle('active', i===0));
+        });
+        document.getElementById('membership_interest').value = 'not_sure';
+        document.getElementById('preferred_time').value      = 'anytime';
+        btn.textContent = 'SENT ✓';
+      } else {
+        throw new Error(json.message);
+      }
+    } catch (err) {
+      alert.className   = 'alert error';
+      alert.textContent = '❌ ' + (err.message || 'Something went wrong. Please try again.');
+      btn.disabled     = false;
+      btn.textContent  = 'SEND INQUIRY →';
+    }
+  });
+</script>
+</body>
+</html>

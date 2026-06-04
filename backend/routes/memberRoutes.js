@@ -80,4 +80,75 @@ router.delete("/:id", verifyToken, requireRole("super_admin"), (req, res) => {
     });
 });
 
+// ── GET member plan history ───────────────────────────────────────────────────
+router.get("/:id/plan-history", verifyToken, (req, res) => {
+  db.query(
+    `SELECT mph.*, a.full_name AS changed_by_name
+     FROM member_plan_history mph
+     LEFT JOIN admins a ON mph.changed_by = a.id
+     WHERE mph.member_id = ?
+     ORDER BY mph.plan_start DESC`,
+    [req.params.id],
+    (err, rows) => {
+      if (err) return res.status(500).json({ success: false, message: "DB Error" });
+      res.json({ success: true, data: rows });
+    }
+  );
+});
+
+// ── ADD plan history entry ────────────────────────────────────────────────────
+router.post("/:id/plan-history", verifyToken, (req, res) => {
+  const { plan_name, plan_start, plan_end, amount_paid, payment_id, notes } = req.body;
+  if (!plan_name || !plan_start)
+    return res.status(400).json({ success: false, message: "plan_name and plan_start required" });
+
+  db.query(
+    `INSERT INTO member_plan_history 
+     (member_id, plan_name, plan_start, plan_end, amount_paid, payment_id, notes, changed_by)
+     VALUES (?,?,?,?,?,?,?,?)`,
+    [req.params.id, plan_name, plan_start, plan_end || null,
+     amount_paid || 0, payment_id || null, notes || null, req.admin?.id || null],
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false, message: "DB Error" });
+
+      // Also update members table current plan
+      db.query(
+        "UPDATE members SET membership_type=?, membership_start=?, membership_end=? WHERE id=?",
+        [plan_name, plan_start, plan_end || null, req.params.id],
+        () => {}
+      );
+      res.status(201).json({ success: true, message: "Plan history added", id: result.insertId });
+    }
+  );
+});
+
+// ── UPDATE plan history entry ─────────────────────────────────────────────────
+router.put("/:id/plan-history/:hid", verifyToken, (req, res) => {
+  const { plan_name, plan_start, plan_end, amount_paid, notes } = req.body;
+  db.query(
+    `UPDATE member_plan_history SET plan_name=?, plan_start=?, plan_end=?, amount_paid=?, notes=?
+     WHERE id=? AND member_id=?`,
+    [plan_name, plan_start, plan_end || null, amount_paid || 0, notes || null,
+     req.params.hid, req.params.id],
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false, message: "DB Error" });
+      if (!result.affectedRows) return res.status(404).json({ success: false, message: "Not found" });
+      res.json({ success: true, message: "Plan history updated" });
+    }
+  );
+});
+
+// ── DELETE plan history entry ─────────────────────────────────────────────────
+router.delete("/:id/plan-history/:hid", verifyToken, requireRole("super_admin"), (req, res) => {
+  db.query(
+    "DELETE FROM member_plan_history WHERE id=? AND member_id=?",
+    [req.params.hid, req.params.id],
+    (err, result) => {
+      if (err) return res.status(500).json({ success: false, message: "DB Error" });
+      if (!result.affectedRows) return res.status(404).json({ success: false, message: "Not found" });
+      res.json({ success: true, message: "Deleted" });
+    }
+  );
+});
+
 module.exports = router;
