@@ -1,7 +1,9 @@
-const express = require("express");
-const router  = express.Router();
-const db      = require("../config/db");
+const express   = require("express");
+const router    = express.Router();
+const db        = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/authMiddleware");
+const sendEmail = require("../utils/sendEmail");
+const { paymentReceiptEmail } = require("../utils/emailTemplates");
 
 // ── GET ALL PAYMENTS (search + pagination + filters) ──────────────────────────
 router.get("/", verifyToken, (req, res) => {
@@ -76,9 +78,8 @@ router.get("/stats/summary", verifyToken, (req, res) => {
 
     Object.entries(queries).forEach(([key, sql]) => {
         db.query(sql, (err, rows) => {
-            if (err) {
-                console.error(`STATS ERROR [${key}]:`, err.message);
-            } else {
+            if (err) { console.error(`STATS ERROR [${key}]:`, err.message); }
+            else {
                 const multi = ["methodBreakdown", "monthly6"].includes(key);
                 results[key] = multi ? rows : (rows[0]?.val ?? 0);
             }
@@ -87,7 +88,7 @@ router.get("/stats/summary", verifyToken, (req, res) => {
     });
 });
 
-// ── GET DUE PAYMENTS (partial payments list) ──────────────────────────────────
+// ── GET DUE PAYMENTS ──────────────────────────────────────────────────────────
 router.get("/due/list", verifyToken, (req, res) => {
     const sql = `
         SELECT p.*, m.full_name, m.email, m.phone
@@ -97,10 +98,7 @@ router.get("/due/list", verifyToken, (req, res) => {
         ORDER BY p.payment_date DESC
     `;
     db.query(sql, (err, rows) => {
-        if (err) {
-            console.error("DUE LIST ERROR:", err.message);
-            return res.status(500).json({ success: false, message: "DB Error" });
-        }
+        if (err) return res.status(500).json({ success: false, message: "DB Error" });
         res.json({ success: true, data: rows });
     });
 });
@@ -117,7 +115,7 @@ router.get("/member/:memberId", verifyToken, (req, res) => {
     );
 });
 
-// ── ADD PAYMENT ───────────────────────────────────────────────────────────────
+// ── ADD PAYMENT — receipt email trigger ───────────────────────────────────────
 router.post("/", verifyToken, (req, res) => {
     const {
         member_id, amount, paid_amount, payment_date,
@@ -125,7 +123,6 @@ router.post("/", verifyToken, (req, res) => {
         months_covered, notes, plan_name, plan_start, plan_end
     } = req.body;
 
-    // ── Validation ────────────────────────────────────────────────────────────
     if (!member_id || !amount || !payment_date)
         return res.status(400).json({ success: false, message: "member_id, amount and payment_date are required" });
 
@@ -133,16 +130,13 @@ router.post("/", verifyToken, (req, res) => {
     if (isNaN(totalAmt) || totalAmt <= 0)
         return res.status(400).json({ success: false, message: "Amount must be a positive number" });
 
-    // ── BUG FIX: paid_amount "" → treat as full payment ───────────────────────
     const paidAmt = (paid_amount !== "" && paid_amount != null && !isNaN(parseFloat(paid_amount)))
         ? parseFloat(paid_amount)
-        : totalAmt;                          // blank = fully paid
+        : totalAmt;
 
     const dueAmt      = parseFloat(Math.max(0, totalAmt - paidAmt).toFixed(2));
     const finalStatus = dueAmt > 0 ? "pending" : (status || "paid");
-
-    // ── BUG FIX: received_by — use req.admin safely ───────────────────────────
-    const receivedBy = req.admin?.id ?? null;
+    const receivedBy  = req.admin?.id ?? null;
 
     const sql = `
         INSERT INTO payments
@@ -154,36 +148,38 @@ router.post("/", verifyToken, (req, res) => {
     `;
 
     const values = [
-        member_id,
-        totalAmt,
-        paidAmt,
-        dueAmt,
-        payment_date,
-        payment_method  || "cash",
-        payment_for     || "monthly",
-        finalStatus,
-        parseInt(months_covered) || 1,
-        notes           || null,
-        receivedBy,
-        plan_name       || null,
-        plan_start      || null,
-        plan_end        || null
+        member_id, totalAmt, paidAmt, dueAmt, payment_date,
+        payment_method || "cash", payment_for || "monthly",
+        finalStatus, parseInt(months_covered) || 1,
+        notes || null, receivedBy,
+        plan_name || null, plan_start || null, plan_end || null
     ];
 
     db.query(sql, values, (err, result) => {
         if (err) {
             console.error("ADD PAYMENT ERROR:", err.message);
-            // ── Return the actual SQL error to frontend for debugging ──────────
-            return res.status(500).json({
-                success: false,
-                message: "DB Error: " + err.message,
-                sqlError: err.code
-            });
+            return res.status(500).json({ success: false, message: "DB Error: " + err.message, sqlError: err.code });
         }
+
+        // ✅ Send payment receipt email (non-blocking)
+        db.query("SELECT * FROM members WHERE id = ?", [member_id], (e, rows) => {
+            if (!e && rows.length && rows[0].email) {
+                const member  = rows[0];
+                const payment = {
+                    id: result.insertId, amount: totalAmt, paid_amount: paidAmt,
+                    due_amount: dueAmt, payment_date, payment_method: payment_method || "cash",
+                    payment_for: payment_for || "monthly", months_covered: parseInt(months_covered) || 1,
+                    plan_name: plan_name || null, notes: notes || null
+                };
+                sendEmail(paymentReceiptEmail(member, payment))
+                  .then(r => console.log(`Receipt email [${member.full_name}]:`, r.success ? "✅ sent" : "❌ " + r.error));
+            }
+        });
+
         res.status(201).json({
-            success:    true,
-            message:    dueAmt > 0 ? `Partial payment recorded. Due: ₹${dueAmt}` : "Payment recorded successfully",
-            id:         result.insertId,
+            success:     true,
+            message:     dueAmt > 0 ? `Partial payment recorded. Due: ₹${dueAmt}` : "Payment recorded successfully",
+            id:          result.insertId,
             paid_amount: paidAmt,
             due_amount:  dueAmt,
             status:      finalStatus
@@ -203,10 +199,8 @@ router.put("/:id", verifyToken, (req, res) => {
     if (isNaN(totalAmt) || totalAmt <= 0)
         return res.status(400).json({ success: false, message: "Amount must be a positive number" });
 
-    // ── BUG FIX: same blank-string guard for update ───────────────────────────
     const paidAmt = (paid_amount !== "" && paid_amount != null && !isNaN(parseFloat(paid_amount)))
-        ? parseFloat(paid_amount)
-        : totalAmt;
+        ? parseFloat(paid_amount) : totalAmt;
 
     const dueAmt      = parseFloat(Math.max(0, totalAmt - paidAmt).toFixed(2));
     const finalStatus = dueAmt > 0 ? "pending" : (status || "paid");
@@ -220,41 +214,21 @@ router.put("/:id", verifyToken, (req, res) => {
         WHERE id=?
     `;
 
-    const values = [
-        member_id,
-        totalAmt,
-        paidAmt,
-        dueAmt,
-        payment_date,
-        payment_method,
-        payment_for,
-        finalStatus,
-        parseInt(months_covered) || 1,
-        notes      || null,
-        plan_name  || null,
-        plan_start || null,
-        plan_end   || null,
+    db.query(sql, [
+        member_id, totalAmt, paidAmt, dueAmt, payment_date,
+        payment_method, payment_for, finalStatus,
+        parseInt(months_covered) || 1, notes || null,
+        plan_name || null, plan_start || null, plan_end || null,
         req.params.id
-    ];
-
-    db.query(sql, values, (err, result) => {
+    ], (err, result) => {
         if (err) {
             console.error("UPDATE PAYMENT ERROR:", err.message);
-            return res.status(500).json({
-                success: false,
-                message: "DB Error: " + err.message,
-                sqlError: err.code
-            });
+            return res.status(500).json({ success: false, message: "DB Error: " + err.message, sqlError: err.code });
         }
         if (!result.affectedRows)
             return res.status(404).json({ success: false, message: "Payment not found" });
 
-        res.json({
-            success:    true,
-            message:    "Payment updated",
-            due_amount: dueAmt,
-            status:     finalStatus
-        });
+        res.json({ success: true, message: "Payment updated", due_amount: dueAmt, status: finalStatus });
     });
 });
 

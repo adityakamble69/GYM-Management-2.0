@@ -1,9 +1,11 @@
-const express = require("express");
-const router  = express.Router();
-const db      = require("../config/db");
+const express   = require("express");
+const router    = express.Router();
+const db        = require("../config/db");
 const { verifyToken } = require("../middleware/authMiddleware");
+const sendEmail = require("../utils/sendEmail");
+const { inquiryAlertEmail } = require("../utils/emailTemplates");
 
-// ── PUBLIC: Submit inquiry (no auth needed) ───────────────────────────────────
+// ── PUBLIC: Submit inquiry — admin alert email trigger ────────────────────────
 router.post("/submit", (req, res) => {
     const { full_name, email, phone, message, membership_interest, preferred_time } = req.body;
 
@@ -16,16 +18,21 @@ router.post("/submit", (req, res) => {
 
     db.query(sql, [
         full_name, email, phone,
-        message            || null,
+        message             || null,
         membership_interest || "not_sure",
         preferred_time      || "anytime"
     ], (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "Something went wrong. Please try again." });
+
+        // ✅ Send admin alert email (non-blocking)
+        sendEmail(inquiryAlertEmail({ full_name, email, phone, message, membership_interest, preferred_time }))
+          .then(r => console.log(`Inquiry alert email [${full_name}]:`, r.success ? "✅ sent" : "❌ " + r.error));
+
         res.status(201).json({ success: true, message: "Thank you! We will contact you soon." });
     });
 });
 
-// ── ADMIN: GET all inquiries (paginated + filter by status) ───────────────────
+// ── ADMIN: GET all inquiries (paginated + filter) ─────────────────────────────
 router.get("/", verifyToken, (req, res) => {
     const page   = parseInt(req.query.page)  || 1;
     const limit  = parseInt(req.query.limit) || 10;
@@ -34,7 +41,7 @@ router.get("/", verifyToken, (req, res) => {
     const offset = (page - 1) * limit;
     const q      = `%${search}%`;
 
-    let where  = `WHERE (full_name LIKE ? OR email LIKE ? OR phone LIKE ?)`;
+    let where    = `WHERE (full_name LIKE ? OR email LIKE ? OR phone LIKE ?)`;
     const params = [q, q, q];
 
     if (status) { where += ` AND status = ?`; params.push(status); }
@@ -53,7 +60,7 @@ router.get("/", verifyToken, (req, res) => {
     });
 });
 
-// ── ADMIN: GET stats (for dashboard) ─────────────────────────────────────────
+// ── ADMIN: GET stats ──────────────────────────────────────────────────────────
 router.get("/stats/summary", verifyToken, (req, res) => {
     db.query(`
         SELECT
@@ -70,7 +77,7 @@ router.get("/stats/summary", verifyToken, (req, res) => {
     });
 });
 
-// ── ADMIN: UPDATE inquiry status + notes ─────────────────────────────────────
+// ── ADMIN: UPDATE inquiry status + notes ──────────────────────────────────────
 router.put("/:id", verifyToken, (req, res) => {
     const { status, notes } = req.body;
     db.query(

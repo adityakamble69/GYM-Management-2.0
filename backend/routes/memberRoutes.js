@@ -1,7 +1,9 @@
-const express = require("express");
-const router  = express.Router();
-const db      = require("../config/db");
+const express   = require("express");
+const router    = express.Router();
+const db        = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/authMiddleware");
+const sendEmail = require("../utils/sendEmail");
+const { welcomeEmail } = require("../utils/emailTemplates");
 
 // GET all members (search + pagination)
 router.get("/", verifyToken, (req, res) => {
@@ -38,20 +40,33 @@ router.get("/:id", verifyToken, (req, res) => {
     });
 });
 
-// ADD member
+// ADD member — welcome email trigger
 router.post("/", verifyToken, (req, res) => {
-    const { full_name, email, phone, address, gender, date_of_birth, membership_type, membership_start, membership_end, status } = req.body;
+    const { full_name, email, phone, address, gender, date_of_birth,
+            membership_type, membership_start, membership_end, status } = req.body;
+
     if (!full_name || !email || !phone || !membership_type)
         return res.status(400).json({ success: false, message: "Name, email, phone, membership_type required" });
 
     db.query(
         "INSERT INTO members (full_name,email,phone,address,gender,date_of_birth,membership_type,membership_start,membership_end,status) VALUES (?,?,?,?,?,?,?,?,?,?)",
-        [full_name, email, phone, address||null, gender||null, date_of_birth||null, membership_type, membership_start||null, membership_end||null, status||"active"],
+        [full_name, email, phone, address||null, gender||null, date_of_birth||null,
+         membership_type, membership_start||null, membership_end||null, status||"active"],
         (err, result) => {
             if (err) {
-                if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ success: false, message: "Email already exists" });
+                if (err.code === "ER_DUP_ENTRY")
+                    return res.status(400).json({ success: false, message: "Email already exists" });
                 return res.status(500).json({ success: false, message: "DB Error" });
             }
+
+            // ✅ Send welcome email (non-blocking)
+            if (email) {
+                sendEmail(welcomeEmail({
+                    full_name, email, phone,
+                    membership_type, membership_start, membership_end
+                })).then(r => console.log(`Welcome email [${full_name}]:`, r.success ? "✅ sent" : "❌ " + r.error));
+            }
+
             res.status(201).json({ success: true, message: "Member added", id: result.insertId });
         }
     );
@@ -59,10 +74,12 @@ router.post("/", verifyToken, (req, res) => {
 
 // UPDATE member
 router.put("/:id", verifyToken, (req, res) => {
-    const { full_name, email, phone, address, gender, date_of_birth, membership_type, membership_start, membership_end, status } = req.body;
+    const { full_name, email, phone, address, gender, date_of_birth,
+            membership_type, membership_start, membership_end, status } = req.body;
     db.query(
         "UPDATE members SET full_name=?,email=?,phone=?,address=?,gender=?,date_of_birth=?,membership_type=?,membership_start=?,membership_end=?,status=? WHERE id=?",
-        [full_name, email, phone, address, gender, date_of_birth, membership_type, membership_start, membership_end, status, req.params.id],
+        [full_name, email, phone, address, gender, date_of_birth,
+         membership_type, membership_start, membership_end, status, req.params.id],
         (err, result) => {
             if (err) return res.status(500).json({ success: false, message: "DB Error" });
             if (!result.affectedRows) return res.status(404).json({ success: false, message: "Not found" });
@@ -71,7 +88,7 @@ router.put("/:id", verifyToken, (req, res) => {
     );
 });
 
-// DELETE member (super_admin only via RBAC)
+// DELETE member (super_admin only)
 router.delete("/:id", verifyToken, requireRole("super_admin"), (req, res) => {
     db.query("DELETE FROM members WHERE id = ?", [req.params.id], (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "DB Error" });
@@ -103,15 +120,13 @@ router.post("/:id/plan-history", verifyToken, (req, res) => {
     return res.status(400).json({ success: false, message: "plan_name and plan_start required" });
 
   db.query(
-    `INSERT INTO member_plan_history 
+    `INSERT INTO member_plan_history
      (member_id, plan_name, plan_start, plan_end, amount_paid, payment_id, notes, changed_by)
      VALUES (?,?,?,?,?,?,?,?)`,
     [req.params.id, plan_name, plan_start, plan_end || null,
      amount_paid || 0, payment_id || null, notes || null, req.admin?.id || null],
     (err, result) => {
       if (err) return res.status(500).json({ success: false, message: "DB Error" });
-
-      // Also update members table current plan
       db.query(
         "UPDATE members SET membership_type=?, membership_start=?, membership_end=? WHERE id=?",
         [plan_name, plan_start, plan_end || null, req.params.id],
