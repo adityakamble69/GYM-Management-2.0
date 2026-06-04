@@ -294,7 +294,7 @@ export default function Dashboard({ onLogout }) {
       <main style={{ flex: 1, padding: "32px 36px", overflowY: "auto" }}>
 
         {/* ── Header ── */}
-        <div className="fade-up" style={{ marginBottom: "28px" }}>
+        <div className="fade-up" style={{ marginBottom: "28px", position: "relative", zIndex: 100 }}>
           <p style={{ color: "var(--text-muted)", fontSize: "12px", marginBottom: "4px", letterSpacing: "0.02em" }}>
             {greet},{" "}
             <span style={{

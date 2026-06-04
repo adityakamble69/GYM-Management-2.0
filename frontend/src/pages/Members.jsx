@@ -3,7 +3,8 @@ import Sidebar from "../components/Sidebar";
 import api from "../services/api";
 import {
   FaPlus, FaSearch, FaEdit, FaTrash, FaTimes,
-  FaChevronLeft, FaChevronRight, FaUsers, FaFilter
+  FaChevronLeft, FaChevronRight, FaUsers, FaFilter,
+  FaHistory, FaRupeeSign, FaCheckCircle, FaClock
 } from "react-icons/fa";
 
 // ─── Reusable Input ────────────────────────────────────────────────────────────
@@ -86,6 +87,10 @@ export default function Members({ onLogout }) {
   const [saving,     setSaving]     = useState(false);
   const [deleteId,   setDeleteId]   = useState(null);
   const [deleteName, setDeleteName] = useState("");
+  // ── Payment History state ─────────────────────────────────────────────────
+  const [historyMember,  setHistoryMember]  = useState(null); // {id, full_name}
+  const [historyRecords, setHistoryRecords] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const searchTimer                 = useRef(null);
 
   // ── On mount: fetch members + plans ──────────────────────────────────────────
@@ -171,6 +176,18 @@ export default function Members({ onLogout }) {
       setDeleteId(null);
       fetchMembers(pagination.page, search);
     } catch (e) { console.error(e); }
+  };
+
+  // ── Payment History ───────────────────────────────────────────────────────
+  const openHistory = async (member) => {
+    setHistoryMember(member);
+    setHistoryRecords([]);
+    setHistoryLoading(true);
+    try {
+      const res = await api.get(`/payments/member/${member.id}`);
+      setHistoryRecords(res.data.data || []);
+    } catch (e) { console.error(e); }
+    finally { setHistoryLoading(false); }
   };
 
   const setF = (key, val) => setForm(p => ({ ...p, [key]: val }));
@@ -296,6 +313,15 @@ export default function Members({ onLogout }) {
                       </td>
                       <td style={{ padding: "14px 16px" }}>
                         <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() => openHistory(m)}
+                            style={{ padding: "5px 10px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--blue)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px", transition: "color 0.15s" }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor = "var(--blue)"}
+                            onMouseLeave={e => e.currentTarget.style.borderColor = "var(--border-default)"}
+                            title="Payment History"
+                          >
+                            <FaHistory style={{ fontSize: "10px" }} /> History
+                          </button>
                           <button
                             onClick={() => openEdit(m)}
                             style={{ padding: "5px 10px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px", transition: "color 0.15s" }}
@@ -505,6 +531,151 @@ export default function Members({ onLogout }) {
                 fontFamily: "var(--font-display)", letterSpacing: "0.03em"
               }}>
                 {saving ? "Saving..." : editingId ? "UPDATE" : "ADD MEMBER"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Payment History Modal ── */}
+      {historyMember && (
+        <div
+          className="fade-in"
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px", backdropFilter: "blur(4px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setHistoryMember(null); }}
+        >
+          <div className="fade-up" style={{
+            background: "var(--bg-surface)", border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-xl)", padding: "28px", width: "100%", maxWidth: "680px",
+            boxShadow: "var(--shadow-lg)", maxHeight: "90vh", overflowY: "auto"
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+              <div>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>
+                  Payment History
+                </h2>
+                <p style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>
+                  {historyMember.full_name} — all payment records
+                </p>
+              </div>
+              <button onClick={() => setHistoryMember(null)} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-muted)", cursor: "pointer", borderRadius: "var(--radius-sm)", width: "30px", height: "30px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <FaTimes style={{ fontSize: "12px" }} />
+              </button>
+            </div>
+
+            <div style={{ height: "1px", background: "var(--border-subtle)", margin: "16px 0" }} />
+
+            {/* Summary Stats */}
+            {!historyLoading && historyRecords.length > 0 && (() => {
+              const totalPaid = historyRecords.reduce((s, r) => s + parseFloat(r.paid_amount || r.amount || 0), 0);
+              const totalDue  = historyRecords.reduce((s, r) => s + parseFloat(r.due_amount || 0), 0);
+              return (
+                <div style={{ display: "flex", gap: "12px", marginBottom: "18px", flexWrap: "wrap" }}>
+                  {[
+                    { label: "Total Paid",    val: `₹${Number(totalPaid).toLocaleString("en-IN")}`, color: "var(--green)",  bg: "var(--green-bg)"  },
+                    { label: "Total Due",     val: `₹${Number(totalDue).toLocaleString("en-IN")}`,  color: "var(--red)",    bg: "var(--red-bg)"    },
+                    { label: "Transactions",  val: historyRecords.length,                            color: "var(--blue)",   bg: "var(--blue-bg)"   },
+                  ].map(s => (
+                    <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}22`, borderRadius: "var(--radius-sm)", padding: "10px 16px", flex: "1 1 120px" }}>
+                      <div style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: s.color }}>{s.val}</div>
+                      <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Records */}
+            {historyLoading ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>Loading...</div>
+            ) : historyRecords.length === 0 ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                <FaHistory style={{ fontSize: "28px", opacity: 0.25, display: "block", margin: "0 auto 10px" }} />
+                No payment records found for this member
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {historyRecords.map((r, i) => {
+                  const isPaid    = parseFloat(r.due_amount || 0) === 0;
+                  const paidAmt   = parseFloat(r.paid_amount || r.amount || 0);
+                  const dueAmt    = parseFloat(r.due_amount  || 0);
+                  const totalAmt  = parseFloat(r.amount || 0);
+                  return (
+                    <div key={r.id} style={{
+                      background: "var(--bg-elevated)", border: "1px solid var(--border-default)",
+                      borderRadius: "var(--radius-md)", padding: "16px 18px",
+                      borderLeft: `3px solid ${isPaid ? "var(--green)" : "var(--yellow)"}`
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
+                        {/* Left — Plan + Date */}
+                        <div>
+                          <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "14px", marginBottom: "4px" }}>
+                            {r.plan_name || r.payment_for || "Payment"}
+                          </div>
+                          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                              📅 {fmt(r.payment_date)}
+                            </span>
+                            {r.months_covered > 0 && (
+                              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                                🗓 {r.months_covered} month{r.months_covered > 1 ? "s" : ""}
+                              </span>
+                            )}
+                            {r.plan_start && r.plan_end && (
+                              <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                                {fmt(r.plan_start)} → {fmt(r.plan_end)}
+                              </span>
+                            )}
+                          </div>
+                          {r.notes && (
+                            <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px", fontStyle: "italic" }}>
+                              💬 {r.notes}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right — Amount + Status */}
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)" }}>
+                            ₹{Number(totalAmt).toLocaleString("en-IN")}
+                          </div>
+                          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "11px", color: "var(--green)" }}>
+                              Paid: ₹{Number(paidAmt).toLocaleString("en-IN")}
+                            </span>
+                            {dueAmt > 0 && (
+                              <span style={{ fontSize: "11px", color: "var(--red)" }}>
+                                Due: ₹{Number(dueAmt).toLocaleString("en-IN")}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", marginTop: "6px" }}>
+                            {/* Method badge */}
+                            <span style={{
+                              fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "99px", textTransform: "uppercase",
+                              background: "rgba(80,80,80,0.15)", color: "var(--text-muted)"
+                            }}>{r.payment_method || "cash"}</span>
+                            {/* Status badge */}
+                            <span style={{
+                              fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "99px",
+                              background: isPaid ? "var(--green-bg)" : "var(--yellow-bg)",
+                              color: isPaid ? "var(--green)" : "var(--yellow)"
+                            }}>
+                              {isPaid ? "✓ Paid" : "⏳ Partial"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)", textAlign: "right" }}>
+              <button onClick={() => setHistoryMember(null)} style={{ padding: "9px 24px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px" }}>
+                Close
               </button>
             </div>
           </div>

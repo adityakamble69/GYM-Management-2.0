@@ -152,7 +152,7 @@ export default function NotificationBell() {
           position: "absolute", top: "calc(100% + 10px)", right: 0,
           width: "360px", background: "var(--bg-surface)",
           border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.4)", zIndex: 999,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.7)", zIndex: 99999,
           overflow: "hidden"
         }}>
 
