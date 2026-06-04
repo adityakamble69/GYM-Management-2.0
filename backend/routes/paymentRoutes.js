@@ -60,10 +60,10 @@ router.get("/stats/summary", verifyToken, (req, res) => {
         totalDue:        "SELECT COALESCE(SUM(due_amount),0)  AS val FROM payments WHERE due_amount > 0",
         totalCount:      "SELECT COUNT(*)                     AS val FROM payments WHERE status='paid'",
         methodBreakdown: "SELECT payment_method, COUNT(*) AS count, SUM(amount) AS total FROM payments WHERE status='paid' GROUP BY payment_method",
-        monthly6:        `SELECT DATE_FORMAT(payment_date,'%b %Y') AS label,
-                                 MONTH(payment_date) AS mo,
-                                 YEAR(payment_date)  AS yr,
-                                 SUM(amount)         AS total
+        monthly6:        `SELECT DATE_FORMAT(MIN(payment_date),'%b %Y') AS label,
+                                 MONTH(MIN(payment_date)) AS mo,
+                                 YEAR(MIN(payment_date))  AS yr,
+                                 SUM(amount)              AS total
                           FROM payments
                           WHERE status='paid'
                             AND payment_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)

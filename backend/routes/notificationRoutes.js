@@ -1,15 +1,13 @@
 const express = require("express");
-const router = express.Router();
-const db = require("../config/db");
+const router  = express.Router();
+const db      = require("../config/db");
 const { verifyToken } = require("../middleware/authMiddleware");
 
 // ── AUTO-GENERATE notifications from live DB data ─────────────────────────────
-// Called internally — scans members, payments, equipment and creates fresh alerts
 function generateNotifications(callback) {
     const inserts = [];
-    let pending = 4; // 3 se 4 karo
+    let pending = 4;
     const done = () => { if (--pending === 0) callback(inserts); };
-
 
     // 1. Expired memberships
     db.query(
@@ -54,7 +52,7 @@ function generateNotifications(callback) {
         (err, rows) => {
             if (!err) rows.forEach(r => {
                 const daysLeft = Math.ceil((new Date(r.next_maintenance) - new Date()) / (1000 * 60 * 60 * 24));
-                const overdue = daysLeft < 0;
+                const overdue  = daysLeft < 0;
                 inserts.push({
                     type: "equipment_maintenance",
                     title: overdue ? "Maintenance Overdue" : "Maintenance Due Soon",
@@ -68,45 +66,25 @@ function generateNotifications(callback) {
         }
     );
 
-    // 4. NEW — Pending inquiries
+    // 4. Pending inquiries
     db.query(
-        `SELECT id, full_name, created_at FROM inquiries 
+        `SELECT id, full_name, created_at FROM inquiries
          WHERE status = 'pending'
          ORDER BY created_at DESC`,
         (err, rows) => {
-            if (!err) rows.forEach(r => inserts.push({
+            if (!err && rows) rows.forEach(r => inserts.push({
                 type: "inquiry",
                 title: "New Inquiry Received",
                 message: `${r.full_name} ne inquiry ki hai — reply pending hai`,
-                ref_id: r.id,
-                ref_type: "inquiry"
+                ref_id: r.id, ref_type: "inquiry"
             }));
             done();
         }
     );
 }
 
-// ── GET ALL NOTIFICATIONS (paginated) ─────────────────────────────────────────
-router.get("/", verifyToken, (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const offset = (page - 1) * limit;
-
-    db.query("SELECT COUNT(*) AS total FROM notifications", (err, countRes) => {
-        if (err) return res.status(500).json({ success: false, message: "DB Error" });
-        const total = countRes[0].total;
-        db.query(
-            "SELECT * FROM notifications ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            [limit, offset],
-            (err, rows) => {
-                if (err) return res.status(500).json({ success: false, message: "DB Error" });
-                res.json({ success: true, data: rows, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } });
-            }
-        );
-    });
-});
-
 // ── GET UNREAD COUNT ──────────────────────────────────────────────────────────
+// IMPORTANT: Specific routes PEHLE, dynamic /:id routes BAAD MEIN
 router.get("/unread-count", verifyToken, (req, res) => {
     db.query("SELECT COUNT(*) AS count FROM notifications WHERE is_read = 0", (err, rows) => {
         if (err) return res.status(500).json({ success: false, message: "DB Error" });
@@ -114,13 +92,12 @@ router.get("/unread-count", verifyToken, (req, res) => {
     });
 });
 
-// ── SYNC: Generate fresh notifications from DB ────────────────────────────────
+// ── SYNC: Generate fresh notifications ───────────────────────────────────────
 router.post("/sync", verifyToken, (req, res) => {
     generateNotifications((inserts) => {
         if (inserts.length === 0)
             return res.json({ success: true, message: "No new alerts", created: 0 });
 
-        // Clear old unread auto-generated ones first, then insert fresh
         db.query(
             `DELETE FROM notifications WHERE is_read = 0 AND type != 'general'`,
             (err) => {
@@ -140,15 +117,7 @@ router.post("/sync", verifyToken, (req, res) => {
     });
 });
 
-// ── MARK ONE AS READ ──────────────────────────────────────────────────────────
-router.put("/:id/read", verifyToken, (req, res) => {
-    db.query("UPDATE notifications SET is_read = 1 WHERE id = ?", [req.params.id], (err) => {
-        if (err) return res.status(500).json({ success: false, message: "DB Error" });
-        res.json({ success: true, message: "Marked as read" });
-    });
-});
-
-// ── MARK ALL AS READ ──────────────────────────────────────────────────────────
+// ── MARK ALL AS READ ── (specific route — BEFORE /:id)
 router.put("/mark-all/read", verifyToken, (req, res) => {
     db.query("UPDATE notifications SET is_read = 1 WHERE is_read = 0", (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "DB Error" });
@@ -156,20 +125,51 @@ router.put("/mark-all/read", verifyToken, (req, res) => {
     });
 });
 
-// ── DELETE ONE ────────────────────────────────────────────────────────────────
+// ── DELETE ALL READ ── (specific route — BEFORE /:id)
+router.delete("/clear/read", verifyToken, (req, res) => {
+    db.query("DELETE FROM notifications WHERE is_read = 1", (err, result) => {
+        if (err) return res.status(500).json({ success: false, message: "DB Error" });
+        res.json({ success: true, message: "Cleared", deleted: result.affectedRows });
+    });
+});
+
+// ── GET ALL NOTIFICATIONS (paginated) ─────────────────────────────────────────
+router.get("/", verifyToken, (req, res) => {
+    const page   = parseInt(req.query.page)  || 1;
+    const limit  = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    db.query("SELECT COUNT(*) AS total FROM notifications", (err, countRes) => {
+        if (err) return res.status(500).json({ success: false, message: "DB Error" });
+        const total = countRes[0].total;
+        db.query(
+            "SELECT * FROM notifications ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            [limit, offset],
+            (err, rows) => {
+                if (err) return res.status(500).json({ success: false, message: "DB Error" });
+                res.json({
+                    success: true, data: rows,
+                    pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+                });
+            }
+        );
+    });
+});
+
+// ── MARK ONE AS READ ── (dynamic route — AFTER specific routes)
+router.put("/:id/read", verifyToken, (req, res) => {
+    db.query("UPDATE notifications SET is_read = 1 WHERE id = ?", [req.params.id], (err) => {
+        if (err) return res.status(500).json({ success: false, message: "DB Error" });
+        res.json({ success: true, message: "Marked as read" });
+    });
+});
+
+// ── DELETE ONE ── (dynamic route — AFTER specific routes)
 router.delete("/:id", verifyToken, (req, res) => {
     db.query("DELETE FROM notifications WHERE id = ?", [req.params.id], (err, result) => {
         if (err) return res.status(500).json({ success: false, message: "DB Error" });
         if (!result.affectedRows) return res.status(404).json({ success: false, message: "Not found" });
         res.json({ success: true, message: "Deleted" });
-    });
-});
-
-// ── DELETE ALL READ ───────────────────────────────────────────────────────────
-router.delete("/clear/read", verifyToken, (req, res) => {
-    db.query("DELETE FROM notifications WHERE is_read = 1", (err, result) => {
-        if (err) return res.status(500).json({ success: false, message: "DB Error" });
-        res.json({ success: true, message: "Cleared", deleted: result.affectedRows });
     });
 });
 
