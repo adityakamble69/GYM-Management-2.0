@@ -17,6 +17,8 @@ const notifRoutes          = require("./routes/notificationRoutes");
 const profileRoutes        = require("./routes/profileRoutes");
 const inquiryRoutes        = require("./routes/inquiryRoutes");
 const membershipPlanRoutes = require("./routes/membershipPlanRoutes");
+const { startReminderCron } = require("./utils/reminderCron");
+const reminderRoutes = require("./routes/reminderRoutes");
 
 // ── Email & Cron ──────────────────────────────────────────────────────────────
 require("./config/mailer");                               // init + verify Gmail on startup
@@ -40,6 +42,8 @@ app.use("/api/notifications",    notifRoutes);
 app.use("/api/profile",          profileRoutes);
 app.use("/api/inquiries",        inquiryRoutes);
 app.use("/api/membership-plans", membershipPlanRoutes);
+app.use("/api/reminders", reminderRoutes);
+startReminderCron();
 
 // ── Serve Public Inquiry Form ─────────────────────────────────────────────────
 app.use("/inquiry", express.static(path.join(__dirname, "public/inquiry")));
