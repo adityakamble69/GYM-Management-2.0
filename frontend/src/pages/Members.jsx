@@ -2,10 +2,12 @@ import { useEffect, useState, useRef } from "react";
 import Sidebar from "../components/Sidebar";
 import api from "../services/api";
 import {
-  FaPlus, FaSearch, FaEdit, FaTrash, FaTimes,
-  FaChevronLeft, FaChevronRight, FaUsers,
-  FaHistory, FaWhatsapp, FaEnvelope, FaCheck, FaPaperPlane
+  FaPlus, FaSearch, FaTimes,
+  FaChevronLeft, FaChevronRight, FaUsers, FaUser,
+  FaWhatsapp, FaEnvelope, FaCheck, FaPaperPlane, FaSyncAlt
 } from "react-icons/fa";
+import MemberProfileDrawer from "../components/MemberProfileDrawer";
+
 
 const Field = ({ label, children }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -27,14 +29,14 @@ const EMPTY = {
   membership_start: "", membership_end: "", status: "active"
 };
 
-const fmt     = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-const fmtLong = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long",  year: "numeric" }) : "—";
+const fmt = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const fmtLong = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : "—";
 const daysLeft = (end) => end ? Math.ceil((new Date(end) - new Date()) / 86400000) : null;
 
 const DUR_COLOR = {
-  monthly:   ["var(--blue)",   "rgba(96,165,250,0.1)"],
+  monthly: ["var(--blue)", "rgba(96,165,250,0.1)"],
   quarterly: ["var(--yellow)", "rgba(251,191,36,0.1)"],
-  yearly:    ["var(--green)",  "rgba(74,222,128,0.1)"],
+  yearly: ["var(--green)", "rgba(74,222,128,0.1)"],
 };
 
 const MembershipBadge = ({ type, plans }) => {
@@ -51,26 +53,26 @@ const StatusBadge = ({ status }) => {
 
 // ─── WhatsApp Templates ────────────────────────────────────────────────────────
 const WA_TEMPLATES = {
-  expiry_warning:   (m) => `Hi ${m.full_name}! 👋\n\nYour *GymPro* membership is expiring in *${daysLeft(m.membership_end) ?? "a few"} day(s)* (${fmtLong(m.membership_end)}).\n\nRenew now to continue your fitness journey! 💪\n\nContact us or visit the gym to renew.\n\n_Team GymPro_ ⚡`,
+  expiry_warning: (m) => `Hi ${m.full_name}! 👋\n\nYour *GymPro* membership is expiring in *${daysLeft(m.membership_end) ?? "a few"} day(s)* (${fmtLong(m.membership_end)}).\n\nRenew now to continue your fitness journey! 💪\n\nContact us or visit the gym to renew.\n\n_Team GymPro_ ⚡`,
   payment_reminder: (m) => `Hi ${m.full_name}! 👋\n\nFriendly reminder — your *GymPro* membership payment is pending.\n\nPlan: *${m.membership_type || "Membership"}*\nExpiry: *${fmtLong(m.membership_end)}*\n\nPlease clear your dues at the earliest. 🙏\n\n_Team GymPro_ ⚡`,
-  renewal_done:     (m) => `Hi ${m.full_name}! 🎉\n\nYour *GymPro* membership has been successfully *renewed*!\n\nPlan: *${m.membership_type || "Membership"}*\nValid Till: *${fmtLong(m.membership_end)}*\n\nThank you! See you at the gym! 🏋️‍♂️\n\n_Team GymPro_ ⚡`,
-  welcome:          (m) => `Hi ${m.full_name}! 🎉\n\nWelcome to *GymPro*! Your membership is now *active*.\n\nPlan: *${m.membership_type || "Standard"}*\nValid Till: *${fmtLong(m.membership_end)}*\n\nBring a valid ID on your first visit. Let's crush those goals! 💪\n\n_Team GymPro_ ⚡`,
+  renewal_done: (m) => `Hi ${m.full_name}! 🎉\n\nYour *GymPro* membership has been successfully *renewed*!\n\nPlan: *${m.membership_type || "Membership"}*\nValid Till: *${fmtLong(m.membership_end)}*\n\nThank you! See you at the gym! 🏋️‍♂️\n\n_Team GymPro_ ⚡`,
+  welcome: (m) => `Hi ${m.full_name}! 🎉\n\nWelcome to *GymPro*! Your membership is now *active*.\n\nPlan: *${m.membership_type || "Standard"}*\nValid Till: *${fmtLong(m.membership_end)}*\n\nBring a valid ID on your first visit. Let's crush those goals! 💪\n\n_Team GymPro_ ⚡`,
 };
 
 const NOTIFY_TYPES = [
-  { key: "expiry_warning",   icon: "⏰", label: "Expiry Warning",       color: "#f59e0b", desc: "Membership khatam hone wali hai" },
+  { key: "expiry_warning", icon: "⏰", label: "Expiry Warning", color: "#f59e0b", desc: "Membership khatam hone wali hai" },
   { key: "payment_reminder", icon: "💳", label: "Payment Due Reminder", color: "#ef4444", desc: "Payment baaki hai — remind karo" },
-  { key: "renewal_done",     icon: "✅", label: "Renewal Confirmation", color: "#10b981", desc: "Membership renew ho gayi — confirm karo" },
-  { key: "welcome",          icon: "🎉", label: "Welcome / Re-Welcome", color: "#6366f1", desc: "Welcome with membership details" },
+  { key: "renewal_done", icon: "✅", label: "Renewal Confirmation", color: "#10b981", desc: "Membership renew ho gayi — confirm karo" },
+  { key: "welcome", icon: "🎉", label: "Welcome / Re-Welcome", color: "#6366f1", desc: "Welcome with membership details" },
 ];
 
 // ─── Notify Modal ──────────────────────────────────────────────────────────────
 function NotifyModal({ member, onClose }) {
-  const [tab,       setTab]      = useState("email");
-  const [selType,   setSelType]  = useState("");
-  const [sending,   setSending]  = useState(false);
-  const [result,    setResult]   = useState(null);
-  const [waPreview, setWaPreview]= useState("");
+  const [tab, setTab] = useState("email");
+  const [selType, setSelType] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null);
+  const [waPreview, setWaPreview] = useState("");
 
   useEffect(() => { setSelType(""); setResult(null); setWaPreview(""); }, [tab]);
   useEffect(() => {
@@ -205,24 +207,351 @@ function NotifyModal({ member, onClose }) {
   );
 }
 
+// ─── Renew Modal ───────────────────────────────────────────────────────────────
+function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
+  const TYPE_LABEL = { monthly: "Monthly Plans", quarterly: "Quarterly Plans", yearly: "Yearly Plans" };
+  const [selectedPlan,    setSelectedPlan]    = useState(member.membership_type || "");
+  const [startFrom,       setStartFrom]       = useState("today");
+  const [paidAmount,      setPaidAmount]      = useState("");
+  const [payMethod,       setPayMethod]       = useState("cash");
+  const [notes,           setNotes]           = useState("");
+  const [saving,          setSaving]          = useState(false);
+  const [error,           setError]           = useState("");
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [collectPending,  setCollectPending]  = useState(false);
+  const [pendingLoading,  setPendingLoading]  = useState(true);
+
+  const plan = plans.find(p => p.name === selectedPlan);
+  const days = daysLeft(member.membership_end);
+
+  // ✅ FIX: Plan select hone par price auto-fill karo
+  useEffect(() => {
+    if (plan && !paidAmount) {
+      setPaidAmount(String(plan.price));
+    }
+  }, [plan?.id]);
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      setPendingLoading(true);
+      try {
+        const r = await api.get(`/payments/member/${member.id}`);
+        const pending = (r.data.data || []).filter(p => p.status === "pending");
+        setPendingPayments(pending);
+      } catch (e) {}
+      finally { setPendingLoading(false); }
+    };
+    fetchPending();
+  }, [member.id]);
+
+  // ✅ FIX: due_amount use karo — actual pending amount
+  const totalPending = pendingPayments.reduce((s, p) => s + Number(p.due_amount || p.amount || 0), 0);
+
+  // Calculate new start & end based on choice
+  const calcDates = () => {
+    if (!plan) return { start: null, end: null };
+    const base = startFrom === "expiry" && member.membership_end && days > 0
+      ? new Date(member.membership_end)
+      : new Date();
+    const end = new Date(base);
+    end.setDate(end.getDate() + plan.duration_days);
+    return {
+      start: base.toISOString().split("T")[0],
+      end:   end.toISOString().split("T")[0]
+    };
+  };
+
+  const { start: newStart, end: newEnd } = calcDates();
+
+  const handleRenew = async () => {
+    setError("");
+    if (!selectedPlan) { setError("Plan select karo."); return; }
+    if (!paidAmount || isNaN(paidAmount) || Number(paidAmount) < 0) { setError("Valid amount enter karo."); return; }
+    setSaving(true);
+    try {
+      // 1. Update member — spread all existing fields so backend required fields (full_name etc) are satisfied
+      await api.put(`/members/${member.id}`, {
+        full_name:        member.full_name,
+        email:            member.email,
+        phone:            member.phone,
+        address:          member.address || "",
+        gender:           member.gender || "",
+        date_of_birth:    member.date_of_birth?.split("T")[0] || "",
+        membership_type:  selectedPlan,
+        membership_start: newStart,
+        membership_end:   newEnd,
+        status:           "active",
+      });
+      // 2. Record renewal payment
+      // ✅ FIX: amount = plan ka full price, paid_amount = jo user ne diya
+      // Backend automatically due_amount = amount - paid_amount calculate karega
+      const planPrice  = plan ? Number(plan.price) : Number(paidAmount);
+      const paidAmt    = Number(paidAmount);
+      const dueAmt     = Math.max(0, planPrice - paidAmt);
+      await api.post("/payments", {
+        member_id:      member.id,
+        amount:         planPrice,            // ← full plan price
+        paid_amount:    paidAmt,              // ← jo abhi diya
+        due_amount:     dueAmt,              // ← baaki
+        payment_for:    plan?.duration_type || "monthly",
+        payment_method: payMethod,
+        payment_date:   new Date().toISOString().split("T")[0],
+        status:         dueAmt > 0 ? "pending" : "paid",  // ← auto status
+        notes:          notes || `Renewal — ${selectedPlan}`,
+        plan_name:      selectedPlan,
+        plan_start:     newStart,
+        plan_end:       newEnd,
+        months_covered: plan ? Math.round(plan.duration_days / 30) : 1,
+      });
+      // 3. If collect pending checked — mark all pending as paid
+      // ✅ FIX: due_amount: 0 aur paid_amount: full amount set karo
+      if (collectPending && pendingPayments.length > 0) {
+        await Promise.all(pendingPayments.map(p =>
+          api.put(`/payments/${p.id}`, {
+            member_id:      p.member_id,
+            amount:         Number(p.amount),
+            paid_amount:    Number(p.amount),  // ← fully paid
+            due_amount:     0,                  // ← ✅ due clear
+            payment_date:   new Date().toISOString().split("T")[0],
+            payment_method: payMethod,
+            payment_for:    p.payment_for    || "monthly",
+            status:         "paid",            // ← ✅ status paid
+            months_covered: p.months_covered || 1,
+            notes:          p.notes          || null,
+            plan_name:      p.plan_name      || null,
+            plan_start:     p.plan_start     || null,
+            plan_end:       p.plan_end       || null,
+          })
+        ));
+      }
+      onSuccess();
+    } catch (e) {
+      setError(e.response?.data?.message || "Renewal failed. Try again.");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div
+      className="fade-in"
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, backdropFilter: "blur(4px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="fade-up" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xl)", width: "100%", maxWidth: "480px", maxHeight: "90vh", overflowY: "auto", boxShadow: "var(--shadow-lg)" }}>
+
+        {/* Header */}
+        <div style={{ padding: "22px 24px 16px", borderBottom: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <FaSyncAlt style={{ fontSize: "14px", color: "var(--green)" }} /> Renew Membership
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: "12px", marginTop: "4px" }}>{member.full_name}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-muted)", cursor: "pointer", borderRadius: "var(--radius-sm)", width: "30px", height: "30px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <FaTimes style={{ fontSize: "12px" }} />
+          </button>
+        </div>
+
+        {/* Current Membership Info */}
+        <div style={{ margin: "16px 24px", padding: "12px 16px", borderRadius: "var(--radius-sm)", background: days !== null && days <= 0 ? "var(--red-bg)" : "var(--bg-elevated)", border: "1px solid var(--border-default)" }}>
+          <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>Current Plan</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)" }}>{member.membership_type || "No Plan"}</div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                {fmt(member.membership_start)} → {fmt(member.membership_end)}
+              </div>
+            </div>
+            <span style={{
+              padding: "3px 10px", borderRadius: "99px", fontSize: "11px", fontWeight: 700,
+              background: days === null ? "rgba(80,80,80,0.12)" : days <= 0 ? "var(--red-bg)" : days <= 7 ? "var(--red-bg)" : days <= 15 ? "var(--yellow-bg)" : "var(--green-bg)",
+              color: days === null ? "var(--text-muted)" : days <= 0 ? "var(--red)" : days <= 7 ? "var(--red)" : days <= 15 ? "var(--yellow)" : "var(--green)"
+            }}>
+              {days === null ? "—" : days <= 0 ? "Expired" : `${days}d left`}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* ── Pending Payment Alert ── */}
+          {!pendingLoading && totalPending > 0 && (
+            <div style={{
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid rgba(248,113,113,0.3)",
+              background: "var(--red-bg)",
+              overflow: "hidden"
+            }}>
+              {/* Header row */}
+              <div style={{ padding: "11px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "14px" }}>⚠️</span>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--red)" }}>
+                      Pending Payment — ₹{Number(totalPending).toLocaleString("en-IN")}
+                    </div>
+                    <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "1px" }}>
+                      {pendingPayments.length} pending record{pendingPayments.length > 1 ? "s" : ""}
+                    </div>
+                  </div>
+                </div>
+                <span style={{ fontSize: "13px", fontWeight: 800, fontFamily: "var(--font-display)", color: "var(--red)" }}>
+                  ₹{Number(totalPending).toLocaleString("en-IN")}
+                </span>
+              </div>
+
+              {/* Individual pending items */}
+              <div style={{ borderTop: "1px solid rgba(248,113,113,0.15)", padding: "8px 14px", display: "flex", flexDirection: "column", gap: "5px" }}>
+                {pendingPayments.map(p => (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-muted)" }}>
+                    <span>{p.payment_for?.replace(/_/g, " ") || "Payment"} · {fmt(p.payment_date)}</span>
+                    {/* ✅ FIX: due_amount show karo — actual baaki amount */}
+                    <span style={{ fontWeight: 600, color: "var(--red)" }}>
+                      ₹{Number(p.due_amount || p.amount).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Collect toggle */}
+              <div
+                onClick={() => setCollectPending(v => !v)}
+                style={{ borderTop: "1px solid rgba(248,113,113,0.15)", padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", background: collectPending ? "rgba(248,113,113,0.1)" : "transparent", transition: "background 0.15s" }}
+              >
+                <div style={{
+                  width: "16px", height: "16px", borderRadius: "4px", flexShrink: 0,
+                  border: collectPending ? "none" : "1px solid rgba(248,113,113,0.5)",
+                  background: collectPending ? "var(--red)" : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  {collectPending && <FaCheck style={{ fontSize: "8px", color: "#fff" }} />}
+                </div>
+                <span style={{ fontSize: "12px", color: collectPending ? "var(--red)" : "var(--text-muted)", fontWeight: collectPending ? 600 : 400 }}>
+                  Renewal ke saath pending ₹{Number(totalPending).toLocaleString("en-IN")} bhi collect karo
+                </span>
+              </div>
+            </div>
+          )}
+          <Field label="New Plan *">
+            <select style={inputStyle} value={selectedPlan} onChange={e => setSelectedPlan(e.target.value)}>
+              <option value="">— Select a Plan —</option>
+              {Object.entries(plansByType).map(([type, list]) => (
+                <optgroup key={type} label={TYPE_LABEL[type] || type}>
+                  {list.map(p => <option key={p.id} value={p.name}>{p.name} — ₹{Number(p.price).toLocaleString("en-IN")} / {p.duration_days} days</option>)}
+                </optgroup>
+              ))}
+            </select>
+            {plan && (
+              <div style={{ marginTop: "6px", padding: "8px 12px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", display: "flex", gap: "20px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Duration: <strong style={{ color: "var(--text-secondary)" }}>{plan.duration_days} days</strong></span>
+                <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Price: <strong style={{ color: "var(--green)" }}>₹{Number(plan.price).toLocaleString("en-IN")}</strong></span>
+              </div>
+            )}
+          </Field>
+
+          {/* Start From */}
+          <Field label="Start From">
+            <div style={{ display: "flex", gap: "8px" }}>
+              {[
+                { val: "today",  label: "Today", desc: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) },
+                { val: "expiry", label: "After Expiry", desc: member.membership_end ? fmt(member.membership_end) : "—", disabled: !member.membership_end || days <= 0 }
+              ].map(opt => (
+                <div
+                  key={opt.val}
+                  onClick={() => !opt.disabled && setStartFrom(opt.val)}
+                  style={{
+                    flex: 1, padding: "10px 12px", borderRadius: "var(--radius-sm)", cursor: opt.disabled ? "not-allowed" : "pointer",
+                    border: startFrom === opt.val ? "1px solid var(--green)" : "1px solid var(--border-default)",
+                    background: startFrom === opt.val ? "var(--green-bg)" : "var(--bg-elevated)",
+                    opacity: opt.disabled ? 0.45 : 1, transition: "all 0.15s"
+                  }}
+                >
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: startFrom === opt.val ? "var(--green)" : "var(--text-primary)" }}>{opt.label}</div>
+                  <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{opt.desc}</div>
+                </div>
+              ))}
+            </div>
+          </Field>
+
+          {/* New Date Preview */}
+          {plan && newStart && (
+            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)" }}>
+              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>New Validity</div>
+              <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 600 }}>
+                {fmt(newStart)} → {fmt(newEnd)}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{plan.duration_days} days</div>
+            </div>
+          )}
+
+          {/* Amount */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Field label="Amount Paid (₹) *">
+              <input
+                style={inputStyle} type="number" min="0"
+                value={paidAmount}
+                placeholder={plan ? plan.price : "0"}
+                onChange={e => setPaidAmount(e.target.value)}
+                onFocus={e => e.target.style.borderColor = "var(--border-strong)"}
+                onBlur={e => e.target.style.borderColor = "var(--border-default)"}
+              />
+            </Field>
+            <Field label="Payment Method">
+              <select style={inputStyle} value={payMethod} onChange={e => setPayMethod(e.target.value)}>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="card">Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="cheque">Cheque</option>
+              </select>
+            </Field>
+          </div>
+
+          {/* Notes */}
+          <Field label="Notes (Optional)">
+            <input
+              style={inputStyle} value={notes}
+              placeholder={`Renewal — ${selectedPlan || "Plan"}`}
+              onChange={e => setNotes(e.target.value)}
+              onFocus={e => e.target.style.borderColor = "var(--border-strong)"}
+              onBlur={e => e.target.style.borderColor = "var(--border-default)"}
+            />
+          </Field>
+
+          {/* Error */}
+          {error && (
+            <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.2)", color: "var(--red)", fontSize: "13px" }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "10px", paddingTop: "4px" }}>
+            <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px" }}>Cancel</button>
+            <button onClick={handleRenew} disabled={saving} style={{ flex: 2, padding: "10px", borderRadius: "var(--radius-sm)", background: saving ? "var(--bg-elevated)" : "var(--green-bg)", border: saving ? "1px solid var(--border-default)" : "1px solid rgba(74,222,128,0.4)", color: saving ? "var(--text-muted)" : "var(--green)", cursor: saving ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-display)", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
+              <FaSyncAlt style={{ fontSize: "11px" }} /> {saving ? "Renewing..." : "CONFIRM RENEWAL"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Members({ onLogout }) {
-  const [members,        setMembers]        = useState([]);
-  const [plans,          setPlans]          = useState([]);
-  const [pagination,     setPagination]     = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
-  const [search,         setSearch]         = useState("");
-  const [loading,        setLoading]        = useState(true);
-  const [showModal,      setShowModal]      = useState(false);
-  const [editingId,      setEditingId]      = useState(null);
-  const [form,           setForm]           = useState(EMPTY);
-  const [formError,      setFormError]      = useState("");
-  const [saving,         setSaving]         = useState(false);
-  const [deleteId,       setDeleteId]       = useState(null);
-  const [deleteName,     setDeleteName]     = useState("");
-  const [historyMember,  setHistoryMember]  = useState(null);
-  const [historyRecords, setHistoryRecords] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [notifyMember,   setNotifyMember]   = useState(null);
+  const [members, setMembers] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [notifyMember, setNotifyMember] = useState(null);
+  const [profileMember, setProfileMember] = useState(null);
+  const [renewMember, setRenewMember] = useState(null);
   const searchTimer = useRef(null);
 
   useEffect(() => { fetchMembers(1, ""); fetchPlans(); }, []);
@@ -232,7 +561,7 @@ export default function Members({ onLogout }) {
     return () => clearTimeout(searchTimer.current);
   }, [search]);
 
-  const fetchPlans   = async () => { try { const r = await api.get("/membership-plans?status=active"); setPlans(r.data.data || []); } catch (e) {} };
+  const fetchPlans = async () => { try { const r = await api.get("/membership-plans?status=active"); setPlans(r.data.data || []); } catch (e) { } };
   const fetchMembers = async (page = 1, q = "") => {
     setLoading(true);
     try { const r = await api.get(`/members?page=${page}&limit=10&search=${encodeURIComponent(q)}`); setMembers(r.data.data || []); setPagination(r.data.pagination || {}); }
@@ -246,11 +575,11 @@ export default function Members({ onLogout }) {
       const start = new Date(), end = new Date();
       end.setDate(end.getDate() + p.duration_days);
       setF("membership_start", start.toISOString().split("T")[0]);
-      setF("membership_end",   end.toISOString().split("T")[0]);
+      setF("membership_end", end.toISOString().split("T")[0]);
     }
   };
 
-  const openAdd  = () => { setForm(EMPTY); setEditingId(null); setFormError(""); setShowModal(true); };
+  const openAdd = () => { setForm(EMPTY); setEditingId(null); setFormError(""); setShowModal(true); };
   const openEdit = (m) => {
     setForm({ full_name: m.full_name || "", email: m.email || "", phone: m.phone || "", address: m.address || "", gender: m.gender || "", date_of_birth: m.date_of_birth?.split("T")[0] || "", membership_type: m.membership_type || "", membership_start: m.membership_start?.split("T")[0] || "", membership_end: m.membership_end?.split("T")[0] || "", status: m.status || "active" });
     setEditingId(m.id); setFormError(""); setShowModal(true);
@@ -262,26 +591,15 @@ export default function Members({ onLogout }) {
     setSaving(true);
     try {
       if (editingId) await api.put(`/members/${editingId}`, form);
-      else           await api.post("/members", form);
+      else await api.post("/members", form);
       setShowModal(false); fetchMembers(pagination.page, search);
     } catch (e) { setFormError(e.response?.data?.message || "Failed to save."); }
     finally { setSaving(false); }
   };
 
-  const handleDelete = async () => {
-    try { await api.delete(`/members/${deleteId}`); setDeleteId(null); fetchMembers(pagination.page, search); }
-    catch (e) { console.error(e); }
-  };
-
-  const openHistory = async (m) => {
-    setHistoryMember(m); setHistoryRecords([]); setHistoryLoading(true);
-    try { const r = await api.get(`/payments/member/${m.id}`); setHistoryRecords(r.data.data || []); }
-    catch (e) {} finally { setHistoryLoading(false); }
-  };
-
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const plansByType = plans.reduce((a, p) => { if (!a[p.duration_type]) a[p.duration_type] = []; a[p.duration_type].push(p); return a; }, {});
-  const TYPE_LABEL  = { monthly: "Monthly Plans", quarterly: "Quarterly Plans", yearly: "Yearly Plans" };
+  const TYPE_LABEL = { monthly: "Monthly Plans", quarterly: "Quarterly Plans", yearly: "Yearly Plans" };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-base)", fontFamily: "var(--font-body)" }}>
@@ -334,12 +652,18 @@ export default function Members({ onLogout }) {
                     const warn = days !== null && days <= 7 && days >= 0;
                     return (
                       <tr key={m.id} style={{ borderBottom: "1px solid var(--border-subtle)", transition: "background 0.1s" }} onMouseEnter={e => e.currentTarget.style.background = "var(--bg-elevated)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <td style={{ padding: "14px 16px" }}>
-                          <div style={{ fontWeight: 600, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <td style={{ padding: "12px 14px" }}>
+                          <div
+                            onClick={() => setProfileMember(m)}
+                            style={{ fontWeight: 600, color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "5px" }}
+                            onMouseEnter={e => e.currentTarget.style.color = "var(--blue)"}
+                            onMouseLeave={e => e.currentTarget.style.color = "var(--text-primary)"}
+                            title="Click to view profile"
+                          >
+                            <FaUser style={{ fontSize: "9px", opacity: 0.4 }} />
                             {m.full_name}
-                            {warn && <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "99px", background: "var(--red-bg)", color: "var(--red)", fontWeight: 600, flexShrink: 0 }}>⚠️ {days}d</span>}
                           </div>
-                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{m.gender || "—"}</div>
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{m.email}</div>
                         </td>
                         <td style={{ padding: "14px 16px" }}>
                           <div style={{ color: "var(--text-secondary)" }}>{m.email || "—"}</div>
@@ -353,9 +677,9 @@ export default function Members({ onLogout }) {
                         <td style={{ padding: "14px 16px" }}><StatusBadge status={m.status} /></td>
                         <td style={{ padding: "14px 16px" }}>
                           <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
-                            {/* History */}
-                            <button onClick={() => openHistory(m)} title="Payment History" style={{ padding: "5px 9px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--blue)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
-                              <FaHistory style={{ fontSize: "10px" }} /> History
+                            {/* Renew */}
+                            <button onClick={() => setRenewMember(m)} title="Renew Membership" style={{ padding: "5px 9px", borderRadius: "var(--radius-sm)", background: "var(--green-bg)", border: "1px solid rgba(74,222,128,0.25)", color: "var(--green)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px", fontWeight: 600 }}>
+                              <FaSyncAlt style={{ fontSize: "10px" }} /> Renew
                             </button>
                             {/* Notify — Email + WhatsApp */}
                             <button
@@ -366,14 +690,6 @@ export default function Members({ onLogout }) {
                               onMouseLeave={e => { e.currentTarget.style.background = warn ? "rgba(245,158,11,0.1)" : "var(--bg-elevated)"; e.currentTarget.style.borderColor = warn ? "rgba(245,158,11,0.35)" : "var(--border-default)"; e.currentTarget.style.color = warn ? "#f59e0b" : "var(--text-secondary)"; }}
                             >
                               <FaEnvelope style={{ fontSize: "10px" }} /> Notify
-                            </button>
-                            {/* Edit */}
-                            <button onClick={() => openEdit(m)} style={{ padding: "5px 9px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }} onMouseEnter={e => e.currentTarget.style.color = "var(--text-primary)"} onMouseLeave={e => e.currentTarget.style.color = "var(--text-secondary)"}>
-                              <FaEdit style={{ fontSize: "10px" }} /> Edit
-                            </button>
-                            {/* Delete */}
-                            <button onClick={() => { setDeleteId(m.id); setDeleteName(m.full_name); }} style={{ padding: "5px 9px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.2)", color: "var(--red)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}>
-                              <FaTrash style={{ fontSize: "10px" }} /> Del
                             </button>
                           </div>
                         </td>
@@ -400,6 +716,16 @@ export default function Members({ onLogout }) {
 
       {/* Notify Modal */}
       {notifyMember && <NotifyModal member={notifyMember} onClose={() => setNotifyMember(null)} />}
+
+      {/* Member Profile Drawer */}
+      <MemberProfileDrawer
+        member={profileMember}
+        onClose={() => setProfileMember(null)}
+        onEdit={(m) => {
+          setProfileMember(null);
+          openEdit(m);
+        }}
+      />
 
       {/* Add/Edit Modal */}
       {showModal && (
@@ -450,81 +776,15 @@ export default function Members({ onLogout }) {
         </div>
       )}
 
-      {/* Payment History Modal */}
-      {historyMember && (
-        <div className="fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }} onClick={e => { if (e.target === e.currentTarget) setHistoryMember(null); }}>
-          <div className="fade-up" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xl)", padding: "28px", width: "100%", maxWidth: "640px", maxHeight: "88vh", overflowY: "auto", boxShadow: "var(--shadow-lg)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>💳 Payment History</h2>
-              <button onClick={() => setHistoryMember(null)} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-muted)", cursor: "pointer", borderRadius: "var(--radius-sm)", width: "30px", height: "30px", display: "flex", alignItems: "center", justifyContent: "center" }}><FaTimes style={{ fontSize: "12px" }} /></button>
-            </div>
-            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>{historyMember.full_name}</p>
-            <div style={{ height: "1px", background: "var(--border-subtle)", margin: "14px 0" }} />
-            {!historyLoading && historyRecords.length > 0 && (() => {
-              const tp = historyRecords.reduce((s, r) => s + parseFloat(r.paid_amount || r.amount || 0), 0);
-              const td = historyRecords.reduce((s, r) => s + parseFloat(r.due_amount  || 0), 0);
-              return <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
-                {[{ label: "Total Paid", val: `₹${Number(tp).toLocaleString("en-IN")}`, color: "var(--green)", bg: "var(--green-bg)" }, { label: "Total Due", val: `₹${Number(td).toLocaleString("en-IN")}`, color: "var(--red)", bg: "var(--red-bg)" }, { label: "Transactions", val: historyRecords.length, color: "var(--blue)", bg: "var(--blue-bg)" }].map(s => (
-                  <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}22`, borderRadius: "var(--radius-sm)", padding: "10px 16px", flex: "1 1 120px" }}>
-                    <div style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: s.color }}>{s.val}</div>
-                    <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>;
-            })()}
-            {historyLoading ? <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>Loading...</div>
-            : historyRecords.length === 0 ? <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}><FaHistory style={{ fontSize: "28px", opacity: 0.25, display: "block", margin: "0 auto 10px" }} />No payment records found</div>
-            : <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {historyRecords.map(r => {
-                  const isPaid = parseFloat(r.due_amount || 0) === 0;
-                  const paidAmt = parseFloat(r.paid_amount || r.amount || 0);
-                  const dueAmt  = parseFloat(r.due_amount  || 0);
-                  const totAmt  = parseFloat(r.amount || 0);
-                  return <div key={r.id} style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "16px 18px", borderLeft: `3px solid ${isPaid ? "var(--green)" : "var(--yellow)"}` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "14px", marginBottom: "4px" }}>{r.plan_name || r.payment_for || "Payment"}</div>
-                        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>📅 {fmt(r.payment_date)}</span>
-                          {r.months_covered > 0 && <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>🗓 {r.months_covered}mo</span>}
-                        </div>
-                        {r.notes && <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "4px", fontStyle: "italic" }}>💬 {r.notes}</div>}
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)" }}>₹{Number(totAmt).toLocaleString("en-IN")}</div>
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px" }}>
-                          <span style={{ fontSize: "11px", color: "var(--green)" }}>Paid: ₹{Number(paidAmt).toLocaleString("en-IN")}</span>
-                          {dueAmt > 0 && <span style={{ fontSize: "11px", color: "var(--red)" }}>Due: ₹{Number(dueAmt).toLocaleString("en-IN")}</span>}
-                        </div>
-                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", marginTop: "6px" }}>
-                          <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "99px", background: "rgba(80,80,80,0.15)", color: "var(--text-muted)", textTransform: "uppercase" }}>{r.payment_method || "cash"}</span>
-                          <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "99px", background: isPaid ? "var(--green-bg)" : "var(--yellow-bg)", color: isPaid ? "var(--green)" : "var(--yellow)" }}>{isPaid ? "✓ Paid" : "⏳ Partial"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>;
-                })}
-              </div>}
-            <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)", textAlign: "right" }}>
-              <button onClick={() => setHistoryMember(null)} style={{ padding: "9px 24px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px" }}>Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Modal */}
-      {deleteId && (
-        <div className="fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }} onClick={e => { if (e.target === e.currentTarget) setDeleteId(null); }}>
-          <div className="fade-up" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xl)", padding: "32px", maxWidth: "380px", width: "100%", boxShadow: "var(--shadow-lg)", textAlign: "center" }}>
-            <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: "18px", color: "var(--red)" }}><FaTrash /></div>
-            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)", marginBottom: "8px" }}>Delete Member?</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: "13px", marginBottom: "24px", lineHeight: 1.6 }}><strong style={{ color: "var(--text-secondary)" }}>{deleteName}</strong> will be permanently removed.</p>
-            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
-              <button onClick={() => setDeleteId(null)} style={{ padding: "9px 20px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px", flex: 1 }}>Cancel</button>
-              <button onClick={handleDelete} style={{ padding: "9px 20px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.3)", color: "var(--red)", cursor: "pointer", fontSize: "13px", fontWeight: 700, flex: 1 }}>Delete</button>
-            </div>
-          </div>
-        </div>
+      {/* Renew Membership Modal */}
+      {renewMember && (
+        <RenewModal
+          member={renewMember}
+          plans={plans}
+          plansByType={plansByType}
+          onClose={() => setRenewMember(null)}
+          onSuccess={() => { setRenewMember(null); fetchMembers(pagination.page, search); }}
+        />
       )}
     </div>
   );
