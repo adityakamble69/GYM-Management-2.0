@@ -61,8 +61,8 @@ const WA_TEMPLATES = {
 
 const NOTIFY_TYPES = [
   { key: "expiry_warning", icon: "⏰", label: "Expiry Warning", color: "#f59e0b", desc: "Membership khatam hone wali hai" },
-  { key: "payment_reminder", icon: "💳", label: "Payment Due Reminder", color: "#ef4444", desc: "Payment baaki hai — remind karo" },
-  { key: "renewal_done", icon: "✅", label: "Renewal Confirmation", color: "#10b981", desc: "Membership renew ho gayi — confirm karo" },
+  { key: "payment_reminder", icon: "💳", label: "Payment Due Reminder", color: "#ef4444", desc: "Payment pending — send a reminder" },
+  { key: "renewal_done", icon: "✅", label: "Renewal Confirmation", color: "#10b981", desc: "Membership renewed — send confirmation" },
   { key: "welcome", icon: "🎉", label: "Welcome / Re-Welcome", color: "#6366f1", desc: "Welcome with membership details" },
 ];
 
@@ -169,7 +169,7 @@ function NotifyModal({ member, onClose }) {
           {tab === "email" && (
             <>
               {!member.email && <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", color: "var(--red)", fontSize: "13px", marginBottom: "14px", border: "1px solid rgba(248,113,113,0.2)" }}>⚠️ No email address registered for this member.</div>}
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>Email type select karo:</p>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>Select email type:</p>
               <TypeSelector value={selType} onChange={setSelType} />
               <ResultBanner />
               <button onClick={sendEmail} disabled={!selType || !member.email || sending} style={{ width: "100%", padding: "11px", borderRadius: "var(--radius-sm)", background: (!selType || !member.email || sending) ? "var(--bg-elevated)" : "var(--text-primary)", color: (!selType || !member.email || sending) ? "var(--text-muted)" : "#0a0a0a", border: "none", cursor: (!selType || !member.email || sending) ? "not-allowed" : "pointer", fontWeight: 700, fontSize: "13px", fontFamily: "var(--font-display)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
@@ -183,7 +183,7 @@ function NotifyModal({ member, onClose }) {
           {tab === "whatsapp" && (
             <>
               {!member.phone && <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", color: "var(--red)", fontSize: "13px", marginBottom: "14px", border: "1px solid rgba(248,113,113,0.2)" }}>⚠️ No phone number registered for this member.</div>}
-              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>Message type select karo:</p>
+              <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>Select message type:</p>
               <TypeSelector value={selType} onChange={setSelType} />
               {waPreview && (
                 <div style={{ marginBottom: "16px" }}>
@@ -191,7 +191,7 @@ function NotifyModal({ member, onClose }) {
                   <div style={{ background: "#1a2e1a", border: "1px solid rgba(74,222,128,0.2)", borderRadius: "var(--radius-sm)", padding: "14px 16px", fontSize: "12px", color: "#dcfce7", lineHeight: 1.75, whiteSpace: "pre-wrap", fontFamily: "monospace", maxHeight: "160px", overflowY: "auto" }}>
                     {waPreview}
                   </div>
-                  <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" }}>💡 WhatsApp mein pre-filled milega — wahan se send karo</p>
+                  <p style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "6px" }}>💡 Message will be pre-filled in WhatsApp — send from there</p>
                 </div>
               )}
               <ResultBanner />
@@ -220,16 +220,30 @@ function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
   const [pendingPayments, setPendingPayments] = useState([]);
   const [collectPending,  setCollectPending]  = useState(false);
   const [pendingLoading,  setPendingLoading]  = useState(true);
+  const [discountType,    setDiscountType]    = useState("flat");
+  const [discountValue,   setDiscountValue]   = useState("");
 
-  const plan = plans.find(p => p.name === selectedPlan);
-  const days = daysLeft(member.membership_end);
+  const plan        = plans.find(p => p.name === selectedPlan);
+  const days        = daysLeft(member.membership_end);
+  const planPrice   = plan ? Number(plan.price) : 0;
 
-  // ✅ FIX: Plan select hone par price auto-fill karo
+  const discountAmt = (() => {
+    const v = Number(discountValue) || 0;
+    if (discountType === "percent") return Math.min(planPrice, Math.round(planPrice * v / 100));
+    return Math.min(planPrice, v);
+  })();
+  const afterDiscount = Math.max(0, planPrice - discountAmt);
+
+  // Auto-fill paid amount when plan or discount changes
   useEffect(() => {
-    if (plan && !paidAmount) {
-      setPaidAmount(String(plan.price));
+    if (plan) {
+      const v = Number(discountValue) || 0;
+      const disc = discountType === "percent"
+        ? Math.min(Number(plan.price), Math.round(Number(plan.price) * v / 100))
+        : Math.min(Number(plan.price), v);
+      setPaidAmount(String(Math.max(0, Number(plan.price) - disc)));
     }
-  }, [plan?.id]);
+  }, [plan?.id, discountValue, discountType]);
 
   useEffect(() => {
     const fetchPending = async () => {
@@ -265,8 +279,8 @@ function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
 
   const handleRenew = async () => {
     setError("");
-    if (!selectedPlan) { setError("Plan select karo."); return; }
-    if (!paidAmount || isNaN(paidAmount) || Number(paidAmount) < 0) { setError("Valid amount enter karo."); return; }
+    if (!selectedPlan) { setError("Please select a plan."); return; }
+    if (!paidAmount || isNaN(paidAmount) || Number(paidAmount) < 0) { setError("Please enter a valid amount."); return; }
     setSaving(true);
     try {
       // 1. Update member — spread all existing fields so backend required fields (full_name etc) are satisfied
@@ -285,18 +299,20 @@ function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
       // 2. Record renewal payment
       // ✅ FIX: amount = plan ka full price, paid_amount = jo user ne diya
       // Backend automatically due_amount = amount - paid_amount calculate karega
-      const planPrice  = plan ? Number(plan.price) : Number(paidAmount);
+      const finalPrice = afterDiscount;                       // price after discount
       const paidAmt    = Number(paidAmount);
-      const dueAmt     = Math.max(0, planPrice - paidAmt);
+      const dueAmt     = Math.max(0, finalPrice - paidAmt);
       await api.post("/payments", {
         member_id:      member.id,
-        amount:         planPrice,            // ← full plan price
-        paid_amount:    paidAmt,              // ← jo abhi diya
-        due_amount:     dueAmt,              // ← baaki
+        amount:         finalPrice,           // ← discounted price
+        paid_amount:    paidAmt,              // ← amount paid now
+        due_amount:     dueAmt,              // ← remaining due
+        discount_amount: discountAmt,        // ← discount applied
+        discount_type:  discountAmt > 0 ? discountType : null,
         payment_for:    plan?.duration_type || "monthly",
         payment_method: payMethod,
         payment_date:   new Date().toISOString().split("T")[0],
-        status:         dueAmt > 0 ? "pending" : "paid",  // ← auto status
+        status:         dueAmt > 0 ? "pending" : "paid",
         notes:          notes || `Renewal — ${selectedPlan}`,
         plan_name:      selectedPlan,
         plan_start:     newStart,
@@ -426,7 +442,7 @@ function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
                   {collectPending && <FaCheck style={{ fontSize: "8px", color: "#fff" }} />}
                 </div>
                 <span style={{ fontSize: "12px", color: collectPending ? "var(--red)" : "var(--text-muted)", fontWeight: collectPending ? 600 : 400 }}>
-                  Renewal ke saath pending ₹{Number(totalPending).toLocaleString("en-IN")} bhi collect karo
+                  Collect pending dues ₹{Number(totalPending).toLocaleString("en-IN")} along with this renewal
                 </span>
               </div>
             </div>
@@ -483,13 +499,45 @@ function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Amount */}
+          {/* Discount */}
+          <Field label="Discount (Optional)">
+            <div style={{ display: "flex", gap: "8px" }}>
+              {/* Type toggle */}
+              <div style={{ display: "flex", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-default)", overflow: "hidden", flexShrink: 0 }}>
+                {[{ val: "flat", label: "₹" }, { val: "percent", label: "%" }].map(opt => (
+                  <button key={opt.val} type="button" onClick={() => { setDiscountType(opt.val); setDiscountValue(""); }}
+                    style={{ padding: "9px 14px", background: discountType === opt.val ? "var(--bg-active, var(--accent-subtle))" : "var(--bg-elevated)", border: "none", color: discountType === opt.val ? "var(--text-primary)" : "var(--text-muted)", cursor: "pointer", fontWeight: discountType === opt.val ? 700 : 400, fontSize: "13px", transition: "all 0.15s" }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                style={{ ...inputStyle, flex: 1 }} type="number" min="0"
+                max={discountType === "percent" ? 100 : planPrice}
+                value={discountValue}
+                placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 200"}
+                onChange={e => setDiscountValue(e.target.value)}
+                onFocus={e => e.target.style.borderColor = "var(--border-strong)"}
+                onBlur={e => e.target.style.borderColor = "var(--border-default)"}
+              />
+            </div>
+            {/* Discount summary strip */}
+            {discountAmt > 0 && plan && (
+              <div style={{ marginTop: "6px", display: "flex", gap: "10px", padding: "7px 12px", borderRadius: "var(--radius-sm)", background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)", flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-muted)" }}>Original: <strong style={{ color: "var(--text-secondary)", textDecoration: "line-through" }}>₹{planPrice.toLocaleString("en-IN")}</strong></span>
+                <span style={{ fontSize: "11px", color: "var(--red)" }}>− ₹{discountAmt.toLocaleString("en-IN")}</span>
+                <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--green)" }}>= ₹{afterDiscount.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+          </Field>
+
+          {/* Amount + Method */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
             <Field label="Amount Paid (₹) *">
               <input
                 style={inputStyle} type="number" min="0"
                 value={paidAmount}
-                placeholder={plan ? plan.price : "0"}
+                placeholder={afterDiscount || (plan ? plan.price : "0")}
                 onChange={e => setPaidAmount(e.target.value)}
                 onFocus={e => e.target.style.borderColor = "var(--border-strong)"}
                 onBlur={e => e.target.style.borderColor = "var(--border-default)"}
@@ -505,6 +553,56 @@ function RenewModal({ member, plans, plansByType, onClose, onSuccess }) {
               </select>
             </Field>
           </div>
+
+          {/* Partial Payment Summary */}
+          {plan && (() => {
+            const paid = Number(paidAmount) || 0;
+            const due  = Math.max(0, afterDiscount - paid);
+            const isPartial = due > 0;
+            return (
+              <div style={{ padding: "12px 14px", borderRadius: "var(--radius-sm)", background: isPartial ? "rgba(245,158,11,0.07)" : "rgba(74,222,128,0.06)", border: `1px solid ${isPartial ? "rgba(245,158,11,0.3)" : "rgba(74,222,128,0.25)"}` }}>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px" }}>
+                  Payment Summary
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {discountAmt > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>Plan Price</span>
+                      <span style={{ color: "var(--text-secondary)", textDecoration: "line-through" }}>₹{planPrice.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  {discountAmt > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                      <span style={{ color: "var(--text-muted)" }}>Discount ({discountType === "percent" ? `${discountValue}%` : "Flat"})</span>
+                      <span style={{ color: "var(--red)", fontWeight: 600 }}>− ₹{discountAmt.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Payable Amount</span>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>₹{afterDiscount.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div style={{ height: "1px", background: "var(--border-subtle)", margin: "2px 0" }} />
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                    <span style={{ color: "var(--text-muted)" }}>Paid Now</span>
+                    <span style={{ color: "var(--green)", fontWeight: 700 }}>₹{paid.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                    <span style={{ fontWeight: 700, color: isPartial ? "#f59e0b" : "var(--green)" }}>
+                      {isPartial ? "⚠️ Balance Due" : "✅ Fully Paid"}
+                    </span>
+                    <span style={{ fontWeight: 800, color: isPartial ? "#f59e0b" : "var(--green)", fontFamily: "var(--font-display)" }}>
+                      ₹{due.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  {isPartial && (
+                    <div style={{ marginTop: "2px", fontSize: "11px", color: "var(--text-muted)", background: "rgba(245,158,11,0.08)", padding: "5px 8px", borderRadius: "6px" }}>
+                      💡 Partial payment — remaining ₹{due.toLocaleString("en-IN")} will be recorded as due.
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Notes */}
           <Field label="Notes (Optional)">
@@ -763,7 +861,7 @@ export default function Members({ onLogout }) {
               <div />
               <Field label="Membership Start"><input style={inputStyle} type="date" value={form.membership_start} onChange={e => setF("membership_start", e.target.value)} onFocus={e => e.target.style.borderColor = "var(--border-strong)"} onBlur={e => e.target.style.borderColor = "var(--border-default)"} /></Field>
               <Field label="Membership End"><input style={inputStyle} type="date" value={form.membership_end} onChange={e => setF("membership_end", e.target.value)} onFocus={e => e.target.style.borderColor = "var(--border-strong)"} onBlur={e => e.target.style.borderColor = "var(--border-default)"} /></Field>
-              <div style={{ gridColumn: "1 / -1" }}><p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>💡 Plan select karne par start/end dates automatically set ho jaati hain.</p></div>
+              <div style={{ gridColumn: "1 / -1" }}><p style={{ fontSize: "11px", color: "var(--text-muted)", margin: 0 }}>💡 Start/end dates are automatically set when a plan is selected.</p></div>
             </div>
             {formError && <div style={{ marginTop: "16px", padding: "11px 14px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.2)", color: "var(--red)", fontSize: "13px" }}>{formError}</div>}
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid var(--border-subtle)" }}>

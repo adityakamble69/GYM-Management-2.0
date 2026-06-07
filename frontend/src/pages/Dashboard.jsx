@@ -14,12 +14,11 @@ import {
   FaEye, FaEyeSlash
 } from "react-icons/fa";
 import NotificationBell from "../components/NotificationBell";
+import RevenueDrillDown from "../components/RevenueDrillDown";
 
 const fmt     = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 const fmtDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-
-// ── Masked value helper ────────────────────────────────────────────────────────
-const MASK = "••••••";
+const MASK    = "••••••";
 
 // ── Stat Card ──────────────────────────────────────────────────────────────────
 const StatCard = ({ icon: Icon, label, value, color, bg, sub, onClick, trend, trendLabel, delay = 0, masked = false, onToggleMask }) => (
@@ -27,57 +26,34 @@ const StatCard = ({ icon: Icon, label, value, color, bg, sub, onClick, trend, tr
     onClick={onClick}
     className="fade-up"
     style={{
-      background: "var(--bg-surface)",
-      border: "1px solid var(--border-subtle)",
+      background: "var(--bg-surface)", border: "1px solid var(--border-subtle)",
       borderRadius: "var(--radius-lg)", padding: "22px",
       cursor: onClick ? "pointer" : "default",
       transition: "all 0.22s cubic-bezier(0.16,1,0.3,1)",
       position: "relative", overflow: "hidden",
       animationDelay: `${delay}s`, opacity: 0
     }}
-    onMouseEnter={e => {
-      if (onClick) {
-        e.currentTarget.style.borderColor = color;
-        e.currentTarget.style.transform = "translateY(-3px)";
-        e.currentTarget.style.boxShadow = `0 8px 32px ${color}20`;
-      }
-    }}
-    onMouseLeave={e => {
-      e.currentTarget.style.borderColor = "var(--border-subtle)";
-      e.currentTarget.style.transform = "translateY(0)";
-      e.currentTarget.style.boxShadow = "none";
-    }}
+    onMouseEnter={e => { if (onClick) { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 8px 32px ${color}20`; }}}
+    onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-subtle)"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
   >
     <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${color}, transparent)`, opacity: 0.8 }} />
     <div style={{ position: "absolute", top: 0, right: 0, width: "80px", height: "80px", borderRadius: "50%", background: bg, filter: "blur(20px)", opacity: 0.5 }} />
-
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", position: "relative" }}>
       <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: bg, border: `1px solid ${color}30`, display: "flex", alignItems: "center", justifyContent: "center", color }}>
         <Icon style={{ fontSize: "15px" }} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        {/* Eye toggle button */}
         {onToggleMask && (
-          <button
-            onClick={e => { e.stopPropagation(); onToggleMask(); }}
+          <button onClick={e => { e.stopPropagation(); onToggleMask(); }}
             style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "12px", padding: "2px", display: "flex", alignItems: "center", opacity: 0.7 }}
-            title={masked ? "Show value" : "Hide value"}
-          >
+            title={masked ? "Show value" : "Hide value"}>
             {masked ? <FaEye /> : <FaEyeSlash />}
           </button>
         )}
         {onClick && <FaArrowRight style={{ color: "var(--text-muted)", fontSize: "10px", opacity: 0.5 }} />}
       </div>
     </div>
-
-    <div style={{
-      fontFamily: "var(--font-display)", fontSize: masked ? "22px" : "30px",
-      fontWeight: 700, color: masked ? "var(--text-muted)" : "var(--text-primary)",
-      lineHeight: 1, marginBottom: "5px", position: "relative",
-      letterSpacing: masked ? "0.15em" : "normal",
-      userSelect: masked ? "none" : "auto",
-      filter: masked ? "blur(0px)" : "none",
-    }}>
+    <div style={{ fontFamily: "var(--font-display)", fontSize: masked ? "22px" : "30px", fontWeight: 700, color: masked ? "var(--text-muted)" : "var(--text-primary)", lineHeight: 1, marginBottom: "5px", position: "relative", letterSpacing: masked ? "0.15em" : "normal", userSelect: masked ? "none" : "auto" }}>
       {masked ? MASK : (value ?? "—")}
     </div>
     <div style={{ fontSize: "12px", color: "var(--text-secondary)", fontWeight: 500, position: "relative" }}>{label}</div>
@@ -93,35 +69,19 @@ const StatCard = ({ icon: Icon, label, value, color, bg, sub, onClick, trend, tr
 
 // ── Mini Stat ──────────────────────────────────────────────────────────────────
 const MiniStat = ({ icon: Icon, label, value, color, delay = 0, masked = false, onToggleMask }) => (
-  <div
-    className="fade-up"
-    style={{
-      background: "var(--bg-surface)", border: "1px solid var(--border-subtle)",
-      borderRadius: "var(--radius-md)", padding: "16px 18px",
-      transition: "all 0.18s", animationDelay: `${delay}s`, opacity: 0,
-      position: "relative"
-    }}
+  <div className="fade-up" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)", padding: "16px 18px", transition: "all 0.18s", animationDelay: `${delay}s`, opacity: 0, position: "relative" }}
     onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.background = "var(--bg-elevated)"; }}
     onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-subtle)"; e.currentTarget.style.background = "var(--bg-surface)"; }}
   >
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
       <Icon style={{ fontSize: "13px", color, marginBottom: "10px" }} />
       {onToggleMask && (
-        <button
-          onClick={onToggleMask}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "11px", padding: "0", opacity: 0.6 }}
-          title={masked ? "Show" : "Hide"}
-        >
+        <button onClick={onToggleMask} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "11px", padding: "0", opacity: 0.6 }} title={masked ? "Show" : "Hide"}>
           {masked ? <FaEye /> : <FaEyeSlash />}
         </button>
       )}
     </div>
-    <div style={{
-      fontFamily: "var(--font-display)", fontSize: masked ? "16px" : "19px", fontWeight: 700,
-      color: masked ? "var(--text-muted)" : "var(--text-primary)",
-      lineHeight: 1, marginBottom: "4px",
-      letterSpacing: masked ? "0.15em" : "normal",
-    }}>
+    <div style={{ fontFamily: "var(--font-display)", fontSize: masked ? "16px" : "19px", fontWeight: 700, color: masked ? "var(--text-muted)" : "var(--text-primary)", lineHeight: 1, marginBottom: "4px", letterSpacing: masked ? "0.15em" : "normal" }}>
       {masked ? MASK : value}
     </div>
     <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{label}</div>
@@ -141,7 +101,7 @@ const ChartTooltip = ({ active, payload, label, prefix = "", suffix = "" }) => {
   );
 };
 
-// ── Recent Row Components ──────────────────────────────────────────────────────
+// ── Row Components ─────────────────────────────────────────────────────────────
 const Avatar = ({ name, size = 32 }) => (
   <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--bg-active)", border: "1px solid var(--border-strong)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.34 + "px", fontWeight: 700, color: "var(--accent-bright)", flexShrink: 0 }}>
     {name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?"}
@@ -154,9 +114,7 @@ const PaymentRow = ({ p }) => (
       <Avatar name={p.full_name} />
       <div>
         <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{p.full_name}</div>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-          {p.payment_for?.replace("_", " ")} · {p.payment_method}
-        </div>
+        <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{p.payment_for?.replace("_", " ")} · {p.payment_method}</div>
       </div>
     </div>
     <div style={{ textAlign: "right" }}>
@@ -232,13 +190,7 @@ export default function Dashboard({ onLogout }) {
   const [lastUpdated,  setLastUpdated]  = useState(null);
   const [refreshing,   setRefreshing]   = useState(false);
 
-  // ── Hidden stats state — sab initially hidden ─────────────────────────────
-  const [shown, setShown] = useState({
-    activeMembers:  false,
-    thisMonthRev:   false,
-    todayRevenue:   false,
-    totalRevenue:   false,
-  });
+  const [shown, setShown] = useState({ activeMembers: false, thisMonthRev: false });
   const toggle = (key) => setShown(s => ({ ...s, [key]: !s[key] }));
 
   const fetchAll = async (isRefresh = false) => {
@@ -253,10 +205,7 @@ export default function Dashboard({ onLogout }) {
         api.get("/members",  { params: { limit: 5, page: 1 } }),
       ]);
       setAttendStats(attendRes.data.data);
-      setWeekly(weekRes.data.data.map(d => ({
-        ...d,
-        label: new Date(d.day).toLocaleDateString("en-IN", { weekday: "short" })
-      })));
+      setWeekly(weekRes.data.data.map(d => ({ ...d, label: new Date(d.day).toLocaleDateString("en-IN", { weekday: "short" }) })));
       setPayStats(payRes.data.data);
       setTrainerStats(trainerRes.data.data);
       setRecentPay(recentPayRes.data.data);
@@ -285,6 +234,16 @@ export default function Dashboard({ onLogout }) {
   const PIE_COLORS    = ["#3b82f6", "#06b6d4", "#8b5cf6", "#34d399", "#fbbf24"];
   const revenueChart  = payStats?.monthly6 || [];
 
+  // ── Pass stats in the required format to RevenueDrillDown ──
+  const drillStats = {
+    totalRevenue:    payStats?.totalRevenue    || 0,
+    todayRevenue:    payStats?.todayRevenue    || 0,
+    thisMonthRev:    payStats?.thisMonth       || 0,
+    pendingPayments: payStats?.pendingCount    || 0,
+    pendingAmount:   payStats?.pendingAmount   || 0,
+    totalCount:      payStats?.totalCount      || 0,
+  };
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-base)", fontFamily: "var(--font-body)" }}>
       <Sidebar onLogout={onLogout} />
@@ -309,8 +268,7 @@ export default function Dashboard({ onLogout }) {
                   Updated {lastUpdated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               )}
-              <button
-                onClick={() => fetchAll(true)} disabled={refreshing}
+              <button onClick={() => fetchAll(true)} disabled={refreshing}
                 style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: refreshing ? "not-allowed" : "pointer", fontSize: "12px", transition: "all 0.15s" }}
                 onMouseEnter={e => { if (!refreshing) { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-default)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
@@ -327,63 +285,57 @@ export default function Dashboard({ onLogout }) {
           </div>
         </div>
 
-        {/* ── Top Stat Cards ── */}
+        {/* ── Top Stat Cards (Attendance + Members + Trainers) ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "14px", marginBottom: "20px" }}>
-
-          {/* Today's Attendance — always visible */}
           <StatCard icon={FaClipboardCheck} color="var(--green)" bg="var(--green-bg)"
             label="Today's Attendance" value={loading ? "—" : attendStats?.todayCount ?? 0}
             trend={attendTrend} delay={0.05} onClick={() => navigate("/attendance")} />
 
-          {/* Active Members — hidden by default */}
           <StatCard icon={FaUsers} color="var(--accent)" bg="var(--accent-subtle)"
-            label="Active Members"
-            value={loading ? "—" : activeMembers}
+            label="Active Members" value={loading ? "—" : activeMembers}
             sub={shown.activeMembers ? `${expiredMembers} expired` : undefined}
             delay={0.10} onClick={() => navigate("/members")}
-            masked={!shown.activeMembers}
-            onToggleMask={() => toggle("activeMembers")} />
+            masked={!shown.activeMembers} onToggleMask={() => toggle("activeMembers")} />
 
-          {/* Active Trainers — always visible */}
           <StatCard icon={FaUserTie} color="var(--yellow)" bg="var(--yellow-bg)"
             label="Active Trainers" value={loading ? "—" : trainerStats?.active ?? 0}
             sub={`${trainerStats?.total ?? 0} total`} delay={0.15} onClick={() => navigate("/trainers")} />
 
-          {/* This Month Rev — hidden by default */}
           <StatCard icon={FaRupeeSign} color="var(--cyan)" bg="var(--cyan-bg)"
-            label="This Month Rev"
-            value={loading ? "—" : fmt(payStats?.thisMonth)}
-            trend={shown.thisMonthRev ? payTrend : undefined}
-            trendLabel="vs last month" delay={0.20} onClick={() => navigate("/payments")}
-            masked={!shown.thisMonthRev}
-            onToggleMask={() => toggle("thisMonthRev")} />
+            label="This Month Rev" value={loading ? "—" : fmt(payStats?.thisMonth)}
+            trend={shown.thisMonthRev ? payTrend : undefined} trendLabel="vs last month"
+            delay={0.20} onClick={() => navigate("/payments")}
+            masked={!shown.thisMonthRev} onToggleMask={() => toggle("thisMonthRev")} />
         </div>
 
-        {/* ── Mini Stats ── */}
+        {/* ── Revenue Drill Down Section ── */}
+        <div className="fade-up" style={{ marginBottom: "20px", animationDelay: "0.22s", opacity: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>
+              Revenue Overview
+            </h2>
+            <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "99px", background: "var(--blue-bg, rgba(59,130,246,0.1))", color: "var(--blue)", border: "1px solid rgba(59,130,246,0.2)", fontWeight: 600 }}>
+              Click to drill down
+            </span>
+          </div>
+          {loading
+            ? <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "14px" }}>
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="skeleton" style={{ height: "100px", borderRadius: "12px" }} />
+                ))}
+              </div>
+            : <RevenueDrillDown stats={drillStats} />
+          }
+        </div>
+
+        {/* ── Mini Stats (Week checkins + expired) ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: "10px", marginBottom: "20px" }}>
-          <MiniStat icon={FaCheckCircle}         color="var(--green)"  label="Week Checkins"    value={loading ? "—" : attendStats?.weekCount ?? 0}  delay={0.25} />
-          <MiniStat icon={FaTimesCircle}         color="var(--red)"    label="Expired Members"  value={loading ? "—" : expiredMembers}               delay={0.28} />
-          <MiniStat icon={FaClock}               color="var(--yellow)" label="Pending Payments" value={loading ? "—" : payStats?.pendingCount ?? 0}  delay={0.31} />
-          <MiniStat icon={FaExclamationTriangle} color="var(--purple)" label="Pending Amount"   value={loading ? "—" : fmt(payStats?.pendingAmount)} delay={0.34} />
-
-          {/* Today's Revenue — hidden */}
-          <MiniStat icon={FaRupeeSign} color="var(--green)" label="Today's Revenue"
-            value={loading ? "—" : fmt(payStats?.todayRevenue)}
-            delay={0.37}
-            masked={!shown.todayRevenue}
-            onToggleMask={() => toggle("todayRevenue")} />
-
-          {/* Total Revenue — hidden */}
-          <MiniStat icon={FaRupeeSign} color="var(--cyan)" label="Total Revenue"
-            value={loading ? "—" : fmt(payStats?.totalRevenue)}
-            delay={0.40}
-            masked={!shown.totalRevenue}
-            onToggleMask={() => toggle("totalRevenue")} />
+          <MiniStat icon={FaCheckCircle}         color="var(--green)"  label="Week Checkins"   value={loading ? "—" : attendStats?.weekCount ?? 0} delay={0.25} />
+          <MiniStat icon={FaTimesCircle}         color="var(--red)"    label="Expired Members" value={loading ? "—" : expiredMembers}              delay={0.28} />
         </div>
 
         {/* ── Charts Row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
-
           <SectionCard>
             <SectionHeader title="Weekly Attendance" sub="Last 7 days check-ins" onNav={() => navigate("/attendance")} />
             <ResponsiveContainer width="100%" height={170}>
@@ -398,8 +350,7 @@ export default function Dashboard({ onLogout }) {
                 <XAxis dataKey="label" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip content={<ChartTooltip suffix=" checkins" />} />
-                <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2}
-                  fill="url(#attendGrad)"
+                <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#attendGrad)"
                   dot={{ fill: "#3b82f6", strokeWidth: 0, r: 3 }}
                   activeDot={{ r: 5, fill: "#60a5fa", stroke: "#fff", strokeWidth: 2 }} />
               </AreaChart>
@@ -427,16 +378,12 @@ export default function Dashboard({ onLogout }) {
 
         {/* ── Bottom Row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 1.4fr", gap: "16px" }}>
-
           <SectionCard>
             <SectionHeader title="Membership Types" sub="Distribution" />
             <ResponsiveContainer width="100%" height={130}>
               <PieChart>
-                <Pie
-                  data={membershipPie.length ? membershipPie : [{ name: "No data", value: 1 }]}
-                  cx="50%" cy="50%" innerRadius={35} outerRadius={58}
-                  paddingAngle={3} dataKey="value"
-                >
+                <Pie data={membershipPie.length ? membershipPie : [{ name: "No data", value: 1 }]}
+                  cx="50%" cy="50%" innerRadius={35} outerRadius={58} paddingAngle={3} dataKey="value">
                   {(membershipPie.length ? membershipPie : [{ name: "No data" }]).map((_, i) => (
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
@@ -460,18 +407,18 @@ export default function Dashboard({ onLogout }) {
           <SectionCard>
             <SectionHeader title="Recent Payments" sub="Latest 5 transactions" onNav={() => navigate("/payments")} />
             {loading ? <SkeletonRows n={4} /> :
-              recentPay.length === 0 ? (
-                <p style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No payments yet</p>
-              ) : recentPay.map(p => <PaymentRow key={p.id} p={p} />)
+              recentPay.length === 0
+                ? <p style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No payments yet</p>
+                : recentPay.map(p => <PaymentRow key={p.id} p={p} />)
             }
           </SectionCard>
 
           <SectionCard>
             <SectionHeader title="Recent Members" sub="Latest 5 joined" onNav={() => navigate("/members")} />
             {loading ? <SkeletonRows n={4} /> :
-              recentMem.length === 0 ? (
-                <p style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No members yet</p>
-              ) : recentMem.map(m => <MemberRow key={m.id} m={m} />)
+              recentMem.length === 0
+                ? <p style={{ color: "var(--text-muted)", fontSize: "13px", textAlign: "center", padding: "20px 0" }}>No members yet</p>
+                : recentMem.map(m => <MemberRow key={m.id} m={m} />)
             }
           </SectionCard>
         </div>

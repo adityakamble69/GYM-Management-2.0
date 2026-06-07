@@ -1,11 +1,13 @@
 // components/MemberProfileDrawer.jsx
-import { useEffect, useState, useCallback } from "react";
+// Usage: <MemberProfileDrawer member={selectedMember} onClose={() => setSelected(null)} onEdit={(m) => openEdit(m)} />
+
+import { useEffect, useState } from "react";
 import {
   FaTimes, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt,
   FaBirthdayCake, FaVenusMars, FaCalendarAlt, FaHistory,
   FaEdit, FaMoneyBill, FaClipboardCheck, FaChevronDown,
   FaChevronUp, FaCrown, FaRupeeSign, FaIdCard, FaLayerGroup,
-  FaWallet, FaRunning, FaCheck, FaExclamationTriangle
+  FaWallet, FaRunning
 } from "react-icons/fa";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -13,13 +15,13 @@ import {
 } from "recharts";
 import api from "../services/api";
 
-const fmt      = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-const fmtLong  = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long",  year: "numeric" }) : "—";
-const fmtMon   = (d) => d ? new Date(d).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—";
-const rupee    = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
-const daysLeft = (end) => end ? Math.ceil((new Date(end) - new Date()) / 86400000) : null;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmt     = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+const fmtLong = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }) : "—";
+const fmtMon  = (d) => d ? new Date(d).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—";
+const rupee   = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
 
-const VALID_FOR = ["monthly", "quarterly", "half_yearly", "yearly", "registration", "other"];
+const daysLeft = (end) => end ? Math.ceil((new Date(end) - new Date()) / 86400000) : null;
 
 // ── Info Row ──────────────────────────────────────────────────────────────────
 const InfoRow = ({ icon: Icon, label, value, color }) => (
@@ -71,40 +73,49 @@ const TabBtn = ({ icon: Icon, label, active, onClick, badge }) => (
   </button>
 );
 
-const Skeleton   = ({ h = 44, mb = 6 }) => (
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+const Skeleton = ({ h = 44, mb = 6 }) => (
   <div style={{ height: `${h}px`, borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", marginBottom: `${mb}px`, animation: "pulse 1.4s ease-in-out infinite" }} />
 );
+
 const EmptyState = ({ text }) => (
-  <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)" }}>{text}</div>
-);
-const SectionLabel = ({ children }) => (
-  <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "10px" }}>{children}</div>
+  <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: "12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-sm)" }}>
+    {text}
+  </div>
 );
 
 // ── Tab: Profile ──────────────────────────────────────────────────────────────
 function TabProfile({ member, days, progressPct }) {
-  const statusColor = member.status === "active" ? "var(--green)"    : member.status === "expired" ? "var(--red)"    : "var(--text-muted)";
-  const statusBg    = member.status === "active" ? "var(--green-bg)" : member.status === "expired" ? "var(--red-bg)" : "rgba(80,80,80,0.12)";
+  const statusColor = member.status === "active" ? "var(--green)"  :
+                      member.status === "expired" ? "var(--red)"    : "var(--text-muted)";
+  const statusBg    = member.status === "active" ? "var(--green-bg)" :
+                      member.status === "expired" ? "var(--red-bg)"  : "rgba(80,80,80,0.12)";
 
   return (
     <div style={{ padding: "20px 22px 24px" }}>
+      {/* Personal Info */}
       <div style={{ marginBottom: "20px" }}>
         <SectionLabel>Personal Info</SectionLabel>
-        <InfoRow icon={FaEnvelope}     label="Email"         value={member.email} />
-        <InfoRow icon={FaPhone}        label="Phone"         value={member.phone} />
-        <InfoRow icon={FaVenusMars}    label="Gender"        value={member.gender} />
-        <InfoRow icon={FaBirthdayCake} label="Date of Birth" value={fmtLong(member.date_of_birth)} />
-        <InfoRow icon={FaMapMarkerAlt} label="Address"       value={member.address} />
-        <InfoRow icon={FaCalendarAlt}  label="Joined On"     value={fmt(member.created_at)} />
+        <InfoRow icon={FaEnvelope}    label="Email"        value={member.email} />
+        <InfoRow icon={FaPhone}       label="Phone"        value={member.phone} />
+        <InfoRow icon={FaVenusMars}   label="Gender"       value={member.gender} />
+        <InfoRow icon={FaBirthdayCake}label="Date of Birth"value={fmtLong(member.date_of_birth)} />
+        <InfoRow icon={FaMapMarkerAlt}label="Address"      value={member.address} />
+        <InfoRow icon={FaCalendarAlt} label="Joined On"    value={fmt(member.created_at)} />
       </div>
 
+      {/* Membership Card */}
       <div>
         <SectionLabel>Membership</SectionLabel>
-        <div style={{ padding: "16px", borderRadius: "var(--radius-md)", background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}>
+        <div style={{
+          padding: "16px", borderRadius: "var(--radius-md)",
+          background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+        }}>
+          {/* Plan name + days badge */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <div>
               <div style={{ fontSize: "15px", fontWeight: 800, fontFamily: "var(--font-display)", color: "var(--text-primary)" }}>
-                {member.plan_name || member.membership_type || "No Active Plan"}
+                {member.plan_name || "No Active Plan"}
               </div>
               <div style={{ display: "flex", gap: "6px", marginTop: "4px", flexWrap: "wrap" }}>
                 <span style={{ padding: "2px 9px", borderRadius: "99px", fontSize: "10px", fontWeight: 600, background: statusBg, color: statusColor, textTransform: "capitalize" }}>
@@ -121,25 +132,27 @@ function TabProfile({ member, days, progressPct }) {
               <span style={{
                 fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "99px",
                 background: days <= 0 ? "var(--red-bg)" : days <= 7 ? "var(--red-bg)" : days <= 15 ? "var(--yellow-bg)" : "var(--green-bg)",
-                color:      days <= 0 ? "var(--red)"    : days <= 7 ? "var(--red)"    : days <= 15 ? "var(--yellow)"    : "var(--green)"
+                color: days <= 0 ? "var(--red)" : days <= 7 ? "var(--red)" : days <= 15 ? "var(--yellow)" : "var(--green)"
               }}>
                 {days <= 0 ? "Expired" : `${days}d left`}
               </span>
             )}
           </div>
 
+          {/* Start → End */}
           <div style={{ display: "flex", gap: "24px", marginBottom: "12px" }}>
             <div>
               <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "2px" }}>Start</div>
               <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 600 }}>{fmt(member.membership_start)}</div>
             </div>
-            <div style={{ borderLeft: "1px dashed var(--border-default)" }} />
+            <div style={{ borderLeft: "1px dashed var(--border-default)", margin: "0" }} />
             <div>
               <div style={{ fontSize: "10px", color: "var(--text-muted)", marginBottom: "2px" }}>End</div>
               <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 600 }}>{fmt(member.membership_end)}</div>
             </div>
           </div>
 
+          {/* Progress Bar */}
           {member.membership_start && member.membership_end && (
             <div>
               <div style={{ height: "6px", background: "var(--bg-surface)", borderRadius: "99px", overflow: "hidden" }}>
@@ -160,8 +173,11 @@ function TabProfile({ member, days, progressPct }) {
 
 // ── Tab: Plan History ─────────────────────────────────────────────────────────
 function TabPlanHistory({ planHistory, loading }) {
+  // Group by month of payment_date
   const byMonth = planHistory.reduce((acc, ph) => {
-    const key = fmtMon(ph.plan_start);
+    const key = ph.payment_date
+      ? new Date(ph.payment_date).toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+      : "Unknown";
     if (!acc[key]) acc[key] = [];
     acc[key].push(ph);
     return acc;
@@ -171,51 +187,53 @@ function TabPlanHistory({ planHistory, loading }) {
     <div style={{ padding: "20px 22px 24px" }}>
       <SectionLabel>Plan Records ({planHistory.length})</SectionLabel>
       {loading ? (
-        [...Array(3)].map((_, i) => <Skeleton key={i} h={70} />)
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {[...Array(3)].map((_, i) => <Skeleton key={i} h={70} />)}
+        </div>
       ) : planHistory.length === 0 ? (
         <EmptyState text="No plan history found" />
       ) : (
-        Object.entries(byMonth).map(([month, list]) => (
-          <div key={month} style={{ marginBottom: "18px" }}>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 0 8px", borderBottom: "1px solid var(--border-subtle)", marginBottom: "8px" }}>
-              {month}
+        Object.entries(byMonth).map(([month, items]) => (
+          <div key={month} style={{ marginBottom: "16px" }}>
+            {/* Month header */}
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 0 8px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>{month}</span>
+              <div style={{ flex: 1, height: "1px", background: "var(--border-subtle)" }} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {list.map((ph) => {
-                const isCurrentPlan = planHistory.indexOf(ph) === 0;
+              {items.map((ph, i) => {
+                const isFirst = planHistory.indexOf(ph) === 0;
                 return (
                   <div key={ph.id} style={{
                     padding: "13px 16px", borderRadius: "var(--radius-sm)",
-                    background: "var(--bg-elevated)",
-                    border: isCurrentPlan ? "1px solid rgba(74,222,128,0.3)" : "1px solid var(--border-subtle)",
-                    borderLeft: `3px solid ${isCurrentPlan ? "var(--green)" : "var(--border-strong)"}`,
+                    background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+                    borderLeft: `3px solid ${isFirst ? "var(--green)" : "var(--border-strong)"}`
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {/* Plan name + badge */}
                         <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                          {isCurrentPlan && <FaCrown style={{ fontSize: "11px", color: "var(--yellow)" }} />}
-                          {ph.plan_name}
-                          {isCurrentPlan && (
-                            <span style={{ fontSize: "9px", fontWeight: 600, padding: "2px 7px", borderRadius: "99px", background: "var(--green-bg)", color: "var(--green)", border: "1px solid rgba(74,222,128,0.3)" }}>
-                              CURRENT
-                            </span>
-                          )}
+                          {isFirst && <FaCrown style={{ fontSize: "10px", color: "var(--yellow)", flexShrink: 0 }} />}
+                          {ph.plan_name || "—"}
+                          {isFirst && <span style={{ fontSize: "9px", fontWeight: 600, padding: "1px 6px", borderRadius: "99px", background: "var(--green-bg)", color: "var(--green)" }}>Current</span>}
                         </div>
-                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "5px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                          <span>Start: <strong style={{ color: "var(--text-secondary)" }}>{fmt(ph.plan_start)}</strong></span>
-                          <span>End: <strong style={{ color: "var(--text-secondary)" }}>{ph.plan_end ? fmt(ph.plan_end) : "Ongoing"}</strong></span>
+                        {/* Dates */}
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "5px", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ background: "var(--bg-surface)", padding: "2px 7px", borderRadius: "4px", border: "1px solid var(--border-subtle)" }}>{fmt(ph.plan_start)}</span>
+                          <span style={{ color: "var(--border-strong)" }}>→</span>
+                          <span style={{ background: "var(--bg-surface)", padding: "2px 7px", borderRadius: "4px", border: "1px solid var(--border-subtle)" }}>{fmt(ph.plan_end)}</span>
                         </div>
-                        {ph.plan_start && ph.plan_end && (
-                          <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "3px" }}>
-                            {Math.ceil((new Date(ph.plan_end) - new Date(ph.plan_start)) / 86400000)} days
-                          </div>
+                        {ph.notes && (
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic", marginTop: "5px" }}>"{ph.notes}"</div>
                         )}
-                        {ph.notes && <div style={{ fontSize: "11px", color: "var(--text-muted)", fontStyle: "italic", marginTop: "4px" }}>"{ph.notes}"</div>}
                       </div>
-                      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "12px" }}>
-                        <div style={{ fontFamily: "var(--font-display)", fontSize: "16px", fontWeight: 800, color: ph.amount_paid > 0 ? "var(--green)" : "var(--text-muted)" }}>
-                          {ph.amount_paid > 0 ? rupee(ph.amount_paid) : "—"}
-                        </div>
+                      {/* Amount */}
+                      <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "14px" }}>
+                        {ph.amount_paid != null
+                          ? <div style={{ fontFamily: "var(--font-display)", fontSize: "15px", fontWeight: 800, color: "var(--green)" }}>{rupee(ph.amount_paid)}</div>
+                          : <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>—</div>
+                        }
+                        <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>{fmt(ph.payment_date)}</div>
                       </div>
                     </div>
                   </div>
@@ -230,16 +248,13 @@ function TabPlanHistory({ planHistory, loading }) {
 }
 
 // ── Tab: Payments ─────────────────────────────────────────────────────────────
-// ── FIX: refreshFn prop se aata hai, fetchPayments nahi hai ──────────────────
-function TabPayments({ payments, loading, refreshFn }) {
-  const [filter,    setFilter]    = useState("all");
-  const [markingId, setMarkingId] = useState(null);
-  const [msg,       setMsg]       = useState("");
+function TabPayments({ payments, loading, onRefresh }) {
+  const [filter,     setFilter]     = useState("all");
+  const [markingId,  setMarkingId]  = useState(null);
 
-  const totalPaid    = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-  const pendingAmt   = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.due_amount || p.amount), 0);
-  const pendingCount = payments.filter(p => p.status === "pending").length;
-  const filtered     = filter === "all" ? payments : payments.filter(p => p.status === filter);
+  const totalPaid  = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+  const pendingAmt = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+  const filtered   = filter === "all" ? payments : payments.filter(p => p.status === filter);
 
   const payByMonth = filtered.reduce((acc, p) => {
     const key = fmtMon(p.payment_date);
@@ -248,37 +263,19 @@ function TabPayments({ payments, loading, refreshFn }) {
     return acc;
   }, {});
 
-  // ── Mark Complete — fixed ─────────────────────────────────────────────────
-  const handleMarkComplete = async (payment) => {
-    if (!window.confirm(`Mark ₹${Number(payment.due_amount || 0).toLocaleString("en-IN")} due as paid?`)) return;
-    setMarkingId(payment.id);
+  const markPaid = async (p) => {
+    setMarkingId(p.id);
     try {
-      const paymentFor = VALID_FOR.includes(payment.payment_for) ? payment.payment_for : "other";
-
-      await api.put(`/payments/${payment.id}`, {
-        member_id:      payment.member_id,
-        amount:         payment.amount,
-        paid_amount:    payment.amount,
-        due_amount:     0,
-        payment_date:   payment.payment_date?.split("T")[0] || new Date().toISOString().split("T")[0],
-        payment_method: payment.payment_method || "cash",
-        payment_for:    paymentFor,
+      await api.put(`/payments/${p.id}`, {
+        ...p,
         status:         "paid",
-        months_covered: payment.months_covered || 1,
-        notes:          payment.notes          || null,
-        plan_name:      payment.plan_name      || null,
-        plan_start:     payment.plan_start ? payment.plan_start.split("T")[0] : null,
-        plan_end:       payment.plan_end   ? payment.plan_end.split("T")[0]   : null,
+        paid_amount:    p.amount,
+        due_amount:     0,
+        payment_date:   new Date().toISOString().split("T")[0],
       });
-
-      setMsg("✅ Payment marked as complete!");
-      if (refreshFn) await refreshFn();           // ← correct call
-    } catch (e) {
-      setMsg("❌ Failed: " + (e.response?.data?.message || e.message));
-    } finally {
-      setMarkingId(null);
-      setTimeout(() => setMsg(""), 4000);
-    }
+      onRefresh();
+    } catch (e) { console.error(e); }
+    finally { setMarkingId(null); }
   };
 
   return (
@@ -286,121 +283,100 @@ function TabPayments({ payments, loading, refreshFn }) {
       {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "18px" }}>
         <div style={{ padding: "12px 14px", borderRadius: "var(--radius-sm)", background: "var(--green-bg)", border: "1px solid rgba(74,222,128,0.2)" }}>
-          <div style={{ fontSize: "18px", fontWeight: 800, fontFamily: "var(--font-display)", color: "var(--green)" }}>{rupee(totalPaid)}</div>
+          <div style={{ fontSize: "16px", fontWeight: 800, fontFamily: "var(--font-display)", color: "var(--green)" }}>{rupee(totalPaid)}</div>
           <div style={{ fontSize: "10px", color: "var(--green)", marginTop: "2px", opacity: 0.8 }}>Total Paid</div>
         </div>
         <div style={{ padding: "12px 14px", borderRadius: "var(--radius-sm)", background: pendingAmt > 0 ? "var(--red-bg)" : "var(--bg-elevated)", border: `1px solid ${pendingAmt > 0 ? "rgba(248,113,113,0.2)" : "var(--border-subtle)"}` }}>
-          <div style={{ fontSize: "18px", fontWeight: 800, fontFamily: "var(--font-display)", color: pendingAmt > 0 ? "var(--red)" : "var(--text-muted)" }}>{rupee(pendingAmt)}</div>
-          <div style={{ fontSize: "10px", color: pendingAmt > 0 ? "var(--red)" : "var(--text-muted)", marginTop: "2px", opacity: 0.8 }}>
-            Pending Due {pendingCount > 0 && `(${pendingCount} records)`}
-          </div>
+          <div style={{ fontSize: "16px", fontWeight: 800, fontFamily: "var(--font-display)", color: pendingAmt > 0 ? "var(--red)" : "var(--text-muted)" }}>{rupee(pendingAmt)}</div>
+          <div style={{ fontSize: "10px", color: pendingAmt > 0 ? "var(--red)" : "var(--text-muted)", marginTop: "2px", opacity: 0.8 }}>Pending Due</div>
         </div>
       </div>
 
-      {msg && (
-        <div style={{ padding: "8px 12px", borderRadius: "var(--radius-sm)", background: msg.startsWith("✅") ? "var(--green-bg)" : "var(--red-bg)", color: msg.startsWith("✅") ? "var(--green)" : "var(--red)", fontSize: "12px", marginBottom: "12px" }}>
-          {msg}
-        </div>
-      )}
-
       {/* Filter Pills */}
-      <div style={{ display: "flex", gap: "6px", marginBottom: "16px" }}>
+      <div style={{ display: "flex", gap: "6px", marginBottom: "14px" }}>
         {["all", "paid", "pending"].map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{
-            padding: "4px 14px", borderRadius: "99px", fontSize: "10px", fontWeight: 600,
+            padding: "4px 12px", borderRadius: "99px", fontSize: "10px", fontWeight: 600,
             cursor: "pointer", textTransform: "capitalize", transition: "all 0.15s",
             background: filter === f ? "var(--text-primary)" : "var(--bg-elevated)",
-            color:      filter === f ? "#0a0a0a"             : "var(--text-muted)",
-            border:     filter === f ? "none"                : "1px solid var(--border-default)"
+            color: filter === f ? "#0a0a0a" : "var(--text-muted)",
+            border: filter === f ? "none" : "1px solid var(--border-default)"
           }}>
             {f} {f !== "all" && `(${payments.filter(p => p.status === f).length})`}
           </button>
         ))}
       </div>
 
-      {/* Month-wise List */}
+      {/* Payment List Month-wise */}
       {loading ? (
         [...Array(4)].map((_, i) => <Skeleton key={i} mb={6} />)
       ) : filtered.length === 0 ? (
         <EmptyState text={`No ${filter === "all" ? "" : filter} payments found`} />
       ) : (
         Object.entries(payByMonth).map(([month, pList]) => {
-          const monthPaid    = pList.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-          const monthPending = pList.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.due_amount || p.amount), 0);
-
+          const monthTotal  = pList.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+          const monthPending = pList.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
           return (
-            <div key={month} style={{ marginBottom: "18px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0 8px", borderBottom: "1px solid var(--border-subtle)", marginBottom: "8px" }}>
+            <div key={month} style={{ marginBottom: "16px" }}>
+              {/* Month header with totals */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0 8px" }}>
                 <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{month}</div>
-                <div style={{ display: "flex", gap: "10px" }}>
-                  {monthPaid    > 0 && <span style={{ fontSize: "10px", color: "var(--green)", fontWeight: 600 }}>✓ {rupee(monthPaid)}</span>}
-                  {monthPending > 0 && <span style={{ fontSize: "10px", color: "var(--red)",   fontWeight: 600 }}>⚠ Due {rupee(monthPending)}</span>}
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  {monthPending > 0 && <span style={{ fontSize: "10px", color: "var(--red)", fontWeight: 600 }}>⏳ {rupee(monthPending)}</span>}
+                  {monthTotal > 0 && <span style={{ fontSize: "10px", color: "var(--green)", fontWeight: 600 }}>✓ {rupee(monthTotal)}</span>}
                 </div>
               </div>
-
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {pList.map(p => {
                   const isPending = p.status === "pending";
-                  const hasDue    = Number(p.due_amount) > 0;
-                  const sc = isPending
-                    ? { c: "var(--yellow)", bg: "var(--yellow-bg)" }
-                    : p.status === "paid"
-                    ? { c: "var(--green)",  bg: "var(--green-bg)"  }
-                    : { c: "var(--red)",    bg: "var(--red-bg)"    };
-
+                  const sc = p.status === "paid"    ? { c: "var(--green)",  bg: "var(--green-bg)"  }
+                           : p.status === "pending" ? { c: "var(--yellow)", bg: "var(--yellow-bg)" }
+                                                    : { c: "var(--red)",    bg: "var(--red-bg)"    };
                   return (
                     <div key={p.id} style={{
                       padding: "10px 14px", borderRadius: "var(--radius-sm)",
-                      background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
+                      background: "var(--bg-elevated)", border: `1px solid ${isPending ? "rgba(251,191,36,0.2)" : "var(--border-subtle)"}`,
                       borderLeft: `3px solid ${sc.c}`
                     }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", textTransform: "capitalize" }}>
-                            {p.plan_name || p.payment_for?.replace("_", " ") || "Payment"}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* Plan name (primary) + payment_for (secondary) */}
+                          <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", textTransform: "capitalize" }}>
+                            {p.plan_name || p.payment_for?.replace(/_/g, " ") || "Payment"}
                           </div>
                           <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
                             {fmt(p.payment_date)} · {p.payment_method}
+                            {p.plan_start && p.plan_end && (
+                              <span style={{ marginLeft: "6px", opacity: 0.7 }}>· {fmt(p.plan_start)} → {fmt(p.plan_end)}</span>
+                            )}
                           </div>
-                          {hasDue && (
-                            <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "5px" }}>
-                              <FaExclamationTriangle style={{ fontSize: "9px", color: "var(--yellow)" }} />
-                              <span style={{ fontSize: "10px", color: "var(--yellow)", fontWeight: 600 }}>
-                                Paid: {rupee(p.paid_amount)} · Due: {rupee(p.due_amount)}
-                              </span>
-                            </div>
-                          )}
                         </div>
-
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontFamily: "var(--font-display)", fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>
-                            {rupee(p.amount)}
-                          </div>
-                          <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: sc.bg, color: sc.c, marginTop: "3px", display: "inline-block", textTransform: "capitalize" }}>
+                          <div style={{ fontFamily: "var(--font-display)", fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>{rupee(p.amount)}</div>
+                          <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: sc.bg, color: sc.c, marginTop: "3px", display: "inline-block" }}>
                             {p.status}
                           </span>
-                          {isPending && (
-                            <div style={{ marginTop: "6px" }}>
-                              <button
-                                onClick={() => handleMarkComplete(p)}
-                                disabled={markingId === p.id}
-                                style={{
-                                  padding: "4px 10px", borderRadius: "99px", fontSize: "10px",
-                                  fontWeight: 700, cursor: markingId === p.id ? "not-allowed" : "pointer",
-                                  background: "var(--green-bg)", border: "1px solid rgba(74,222,128,0.4)",
-                                  color: "var(--green)", display: "flex", alignItems: "center", gap: "4px",
-                                  transition: "all 0.15s", whiteSpace: "nowrap"
-                                }}
-                                onMouseEnter={e => { if (markingId !== p.id) e.currentTarget.style.background = "rgba(74,222,128,0.2)"; }}
-                                onMouseLeave={e => e.currentTarget.style.background = "var(--green-bg)"}
-                              >
-                                <FaCheck style={{ fontSize: "8px" }} />
-                                {markingId === p.id ? "Updating..." : "Mark Complete"}
-                              </button>
-                            </div>
-                          )}
                         </div>
                       </div>
+                      {/* Mark Complete button for pending */}
+                      {isPending && (
+                        <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid rgba(251,191,36,0.15)" }}>
+                          <button
+                            onClick={() => markPaid(p)}
+                            disabled={markingId === p.id}
+                            style={{
+                              width: "100%", padding: "6px", borderRadius: "var(--radius-sm)", cursor: markingId === p.id ? "not-allowed" : "pointer",
+                              background: markingId === p.id ? "var(--bg-surface)" : "rgba(74,222,128,0.08)",
+                              border: "1px solid rgba(74,222,128,0.3)", color: markingId === p.id ? "var(--text-muted)" : "var(--green)",
+                              fontSize: "11px", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
+                              transition: "all 0.15s"
+                            }}
+                          >
+                            <FaCheck style={{ fontSize: "9px" }} />
+                            {markingId === p.id ? "Marking..." : `Mark Complete — ${rupee(p.amount)}`}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -417,12 +393,14 @@ function TabPayments({ payments, loading, refreshFn }) {
 function TabAttendance({ attendance, loading, attChartData, thisMonthAtt }) {
   return (
     <div style={{ padding: "20px 22px 24px" }}>
+      {/* Stats Row */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "18px" }}>
-        <StatCard label="Total Visits" value={attendance.length}                                        color="var(--text-primary)" />
-        <StatCard label="This Month"   value={thisMonthAtt}                                             color="var(--blue)" />
+        <StatCard label="Total Visits" value={attendance.length} color="var(--text-primary)" />
+        <StatCard label="This Month"   value={thisMonthAtt}      color="var(--blue)" />
         <StatCard label="Last Visit"   value={attendance.length > 0 ? fmt(attendance[0]?.date) : "—"} color="var(--text-muted)" />
       </div>
 
+      {/* Chart */}
       {!loading && attendance.length > 0 && (
         <div style={{ marginBottom: "20px" }}>
           <SectionLabel>Last 6 Months</SectionLabel>
@@ -431,7 +409,10 @@ function TabAttendance({ attendance, loading, attChartData, thisMonthAtt }) {
               <BarChart data={attChartData} margin={{ top: 0, right: 0, bottom: 0, left: -28 }}>
                 <XAxis dataKey="label" tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", borderRadius: "6px", fontSize: "11px" }} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                <Tooltip
+                  contentStyle={{ background: "var(--bg-elevated)", border: "1px solid var(--border-default)", borderRadius: "6px", fontSize: "11px" }}
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {attChartData.map((_, i) => (
                     <Cell key={i} fill={i === attChartData.length - 1 ? "var(--text-primary)" : "var(--bg-active)"} />
@@ -443,6 +424,7 @@ function TabAttendance({ attendance, loading, attChartData, thisMonthAtt }) {
         </div>
       )}
 
+      {/* Records */}
       <SectionLabel>Records</SectionLabel>
       {loading ? (
         [...Array(5)].map((_, i) => <Skeleton key={i} h={40} mb={5} />)
@@ -450,19 +432,23 @@ function TabAttendance({ attendance, loading, attChartData, thisMonthAtt }) {
         <EmptyState text="No attendance records" />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          {attendance.slice(0, 20).map(a => (
-            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)" }}>
+          {attendance.slice(0, 15).map(a => (
+            <div key={a.id} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "8px 12px", borderRadius: "var(--radius-sm)",
+              background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)"
+            }}>
               <div style={{ fontSize: "12px", color: "var(--text-primary)", fontWeight: 500 }}>{fmt(a.date)}</div>
               <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                {a.check_in ? new Date(a.check_in).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
-                {a.check_out ? ` → ${new Date(a.check_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : ""}
+                {a.check_in ? a.check_in.slice(11, 16) : "—"}
+                {a.check_out ? ` → ${a.check_out.slice(11, 16)}` : ""}
               </div>
               <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "99px", background: "var(--green-bg)", color: "var(--green)" }}>✓ Present</span>
             </div>
           ))}
-          {attendance.length > 20 && (
+          {attendance.length > 15 && (
             <div style={{ fontSize: "11px", color: "var(--text-muted)", textAlign: "center", padding: "8px" }}>
-              +{attendance.length - 20} more records
+              +{attendance.length - 15} more records
             </div>
           )}
         </div>
@@ -471,7 +457,14 @@ function TabAttendance({ attendance, loading, attChartData, thisMonthAtt }) {
   );
 }
 
-// ── Main Modal ────────────────────────────────────────────────────────────────
+// ── Section Label ─────────────────────────────────────────────────────────────
+const SectionLabel = ({ children }) => (
+  <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "10px" }}>
+    {children}
+  </div>
+);
+
+// ── Main Drawer ───────────────────────────────────────────────────────────────
 export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordPayment, onMarkAttendance }) {
   const [payments,    setPayments]    = useState([]);
   const [attendance,  setAttendance]  = useState([]);
@@ -480,44 +473,73 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
   const [activeTab,   setActiveTab]   = useState("profile");
 
   useEffect(() => {
-    if (member) { setLoading(true); setActiveTab("profile"); fetchAll(); }
+    if (member) { setLoading(true); fetchAll(); }
   }, [member?.id]);
 
   const fetchAll = async () => {
     try {
-      const [payRes, attendRes, planRes] = await Promise.all([
+      const [payRes, attendRes] = await Promise.all([
         api.get(`/payments/member/${member.id}`),
         api.get(`/attendance/member/${member.id}`),
-        api.get(`/members/${member.id}/plan-history`).catch(() => ({ data: { data: [] } }))
       ]);
-      setPayments(payRes.data.data     || []);
+      const allPayments = payRes.data.data || [];
+      setPayments(allPayments);
       setAttendance(attendRes.data.data || []);
-      setPlanHistory(planRes.data.data  || []);
+
+      // Build plan history from payments (plan_name + plan_start + plan_end fields)
+      // + always include current member plan as first entry if not already covered
+      const fromPayments = allPayments
+        .filter(p => p.plan_name)
+        .map(p => ({
+          id:         p.id,
+          plan_name:  p.plan_name,
+          plan_start: p.plan_start,
+          plan_end:   p.plan_end,
+          amount_paid: p.paid_amount || p.amount,
+          payment_date: p.payment_date,
+          notes:      p.notes,
+        }));
+
+      // If current member plan not in payments list, add it manually from member object
+      const hasCurrent = fromPayments.some(
+        ph => ph.plan_name === member.membership_type &&
+              ph.plan_start?.slice(0,10) === member.membership_start?.slice(0,10)
+      );
+      if (!hasCurrent && member.membership_type) {
+        fromPayments.unshift({
+          id:          "current",
+          plan_name:   member.membership_type,
+          plan_start:  member.membership_start,
+          plan_end:    member.membership_end,
+          amount_paid: null,
+          payment_date: member.membership_start,
+          notes:       null,
+        });
+      }
+
+      // Sort newest first
+      fromPayments.sort((a, b) => new Date(b.payment_date || 0) - new Date(a.payment_date || 0));
+      setPlanHistory(fromPayments);
+
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
-
-  // ── refreshFn — sirf payments reload karta hai ────────────────────────────
-  const refreshPayments = useCallback(async () => {
-    try {
-      const r = await api.get(`/payments/member/${member.id}`);
-      setPayments(r.data.data || []);
-    } catch (e) { console.error(e); }
-  }, [member?.id]);
 
   if (!member) return null;
 
   const days         = daysLeft(member.membership_end);
   const initials     = member.full_name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
   const totalPaid    = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-  const pendingAmt   = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.due_amount || p.amount), 0);
+  const pendingAmt   = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
   const thisMonthAtt = attendance.filter(a => {
     const d = new Date(a.date), n = new Date();
     return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
   }).length;
 
-  const statusColor = member.status === "active" ? "var(--green)"    : member.status === "expired" ? "var(--red)"    : "var(--text-muted)";
-  const statusBg    = member.status === "active" ? "var(--green-bg)" : member.status === "expired" ? "var(--red-bg)" : "rgba(80,80,80,0.12)";
+  const statusColor = member.status === "active" ? "var(--green)"  :
+                      member.status === "expired" ? "var(--red)"    : "var(--text-muted)";
+  const statusBg    = member.status === "active" ? "var(--green-bg)" :
+                      member.status === "expired" ? "var(--red-bg)"  : "rgba(80,80,80,0.12)";
 
   const progressPct = (() => {
     if (!member.membership_start || !member.membership_end) return 0;
@@ -541,32 +563,36 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
     return months;
   })();
 
-  const pendingPayCount = payments.filter(p => p.status === "pending").length;
-
   const TABS = [
-    { key: "profile",  label: "Profile",  icon: FaIdCard,    badge: 0 },
-    { key: "plans",    label: "Plans",    icon: FaLayerGroup, badge: 0 },
-    { key: "payments", label: "Payments", icon: FaWallet,     badge: pendingPayCount },
-    { key: "attend",   label: "Attend",   icon: FaRunning,    badge: 0 },
+    { key: "profile",  label: "Profile",  icon: FaIdCard,     badge: 0 },
+    { key: "plans",    label: "Plans",    icon: FaLayerGroup,  badge: 0 },
+    { key: "payments", label: "Payments", icon: FaWallet,      badge: payments.filter(p => p.status === "pending").length },
+    { key: "attend",   label: "Attend",   icon: FaRunning,     badge: 0 },
   ];
 
   return (
     <>
+      {/* Overlay */}
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.78)", zIndex: 1300, backdropFilter: "blur(5px)" }} />
 
+      {/* Modal */}
       <div style={{
         position: "fixed", top: "50%", left: "50%",
         transform: "translate(-50%, -50%)",
-        width: "min(720px, 96vw)", maxHeight: "90vh",
-        background: "var(--bg-surface)", border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-xl)", zIndex: 1301,
-        display: "flex", flexDirection: "column",
+        width: "min(720px, 96vw)",
+        maxHeight: "90vh",
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-xl)",
+        zIndex: 1301, display: "flex", flexDirection: "column",
         boxShadow: "0 32px 96px rgba(0,0,0,0.7)",
-        animation: "modalPop 0.22s ease", overflow: "hidden"
+        animation: "modalPop 0.22s ease",
+        overflow: "hidden"
       }}>
 
         {/* ── Header ── */}
         <div style={{ padding: "20px 24px 0", background: "var(--bg-elevated)", flexShrink: 0, borderBottom: "1px solid var(--border-subtle)" }}>
+          {/* Top Row: Avatar + Name + Close */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <div style={{
@@ -604,9 +630,9 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
 
           {/* Quick Stats */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "16px" }}>
-            <StatCard label="Total Paid"  value={rupee(totalPaid)}         color="var(--green)" />
-            <StatCard label="This Month"  value={`${thisMonthAtt} visits`} color="var(--blue)" />
-            <StatCard label="Pending Due" value={rupee(pendingAmt)}         color={pendingAmt > 0 ? "var(--red)" : "var(--text-muted)"} />
+            <StatCard label="Total Paid"    value={rupee(totalPaid)}    color="var(--green)" />
+            <StatCard label="This Month"    value={`${thisMonthAtt} visits`} color="var(--blue)" />
+            <StatCard label="Pending"       value={rupee(pendingAmt)}   color={pendingAmt > 0 ? "var(--red)" : "var(--text-muted)"} />
           </div>
 
           {/* Action Buttons */}
@@ -629,17 +655,37 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
           {/* Tab Bar */}
           <div style={{ display: "flex", borderTop: "1px solid var(--border-subtle)" }}>
             {TABS.map(t => (
-              <TabBtn key={t.key} icon={t.icon} label={t.label} active={activeTab === t.key} badge={t.badge} onClick={() => setActiveTab(t.key)} />
+              <TabBtn
+                key={t.key}
+                icon={t.icon}
+                label={t.label}
+                active={activeTab === t.key}
+                badge={t.badge}
+                onClick={() => setActiveTab(t.key)}
+              />
             ))}
           </div>
         </div>
 
-        {/* ── Tab Content ── */}
+        {/* ── Tab Content (Scrollable) ── */}
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {activeTab === "profile"  && <TabProfile      member={member} days={days} progressPct={progressPct} />}
-          {activeTab === "plans"    && <TabPlanHistory   planHistory={planHistory} loading={loading} />}
-          {activeTab === "payments" && <TabPayments      payments={payments} loading={loading} refreshFn={refreshPayments} />}
-          {activeTab === "attend"   && <TabAttendance    attendance={attendance} loading={loading} attChartData={attChartData} thisMonthAtt={thisMonthAtt} />}
+          {activeTab === "profile" && (
+            <TabProfile member={member} days={days} progressPct={progressPct} />
+          )}
+          {activeTab === "plans" && (
+            <TabPlanHistory planHistory={planHistory} loading={loading} />
+          )}
+          {activeTab === "payments" && (
+            <TabPayments payments={payments} loading={loading} />
+          )}
+          {activeTab === "attend" && (
+            <TabAttendance
+              attendance={attendance}
+              loading={loading}
+              attChartData={attChartData}
+              thisMonthAtt={thisMonthAtt}
+            />
+          )}
         </div>
       </div>
 
