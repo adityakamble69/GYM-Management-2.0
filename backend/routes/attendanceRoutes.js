@@ -3,9 +3,23 @@ const router  = express.Router();
 const db      = require("../config/db");
 const { verifyToken, requireRole } = require("../middleware/authMiddleware");
 
+// ── IST Time Helpers ──────────────────────────────────────────────────────────
+// India Standard Time = UTC + 5:30
+const getISTDate = () => {
+    const now = new Date();
+    const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    return ist.toISOString().split("T")[0]; // "YYYY-MM-DD"
+};
+
+const getISTDateTime = () => {
+    const now = new Date();
+    const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+    return ist.toISOString().slice(0, 19).replace("T", " "); // "YYYY-MM-DD HH:MM:SS"
+};
+
 // ── GET today's attendance list ───────────────────────────────────────────────
 router.get("/today", verifyToken, (req, res) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getISTDate();
     const sql = `
         SELECT a.*, m.full_name, m.email, m.phone, m.membership_type
         FROM attendance a
@@ -97,7 +111,7 @@ router.get("/member/:memberId", verifyToken, (req, res) => {
 
 // ── GET dashboard summary stats ───────────────────────────────────────────
 router.get("/stats/summary", verifyToken, (req, res) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getISTDate();
     const queries = {
         todayCount:   "SELECT COUNT(*) AS val FROM attendance WHERE date = ? AND status = 'present'",
         yesterdayCount: "SELECT COUNT(*) AS val FROM attendance WHERE date = DATE_SUB(?, INTERVAL 1 DAY) AND status = 'present'",
@@ -128,8 +142,8 @@ router.post("/checkin", verifyToken, (req, res) => {
     const { member_id, notes } = req.body;
     if (!member_id) return res.status(400).json({ success: false, message: "member_id required" });
 
-    const today = new Date().toISOString().split("T")[0];
-    const now   = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const today = getISTDate();
+    const now   = getISTDateTime();
 
     // Check if already checked in today
     db.query(
@@ -155,7 +169,7 @@ router.post("/checkin", verifyToken, (req, res) => {
 
 // ── MARK check-out ────────────────────────────────────────────────────────
 router.put("/checkout/:id", verifyToken, (req, res) => {
-    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const now = getISTDateTime();
     db.query(
         "UPDATE attendance SET check_out = ? WHERE id = ? AND check_out IS NULL",
         [now, req.params.id],

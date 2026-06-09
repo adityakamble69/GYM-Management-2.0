@@ -269,9 +269,9 @@ function TabPayments({ payments, loading, onRefresh }) {
       await api.put(`/payments/${p.id}`, {
         member_id:      p.member_id,
         amount:         Number(p.amount),
-        paid_amount:    Number(p.amount),
-        due_amount:     0,
-        payment_date:   new Date().toISOString().split("T")[0],
+        paid_amount:    Number(p.amount),   // full amount = paid
+        due_amount:     0,                  // due = 0
+        payment_date:   p.payment_date ? p.payment_date.split("T")[0] : new Date().toISOString().split("T")[0],
         payment_method: p.payment_method || "cash",
         payment_for:    p.payment_for    || "monthly",
         status:         "paid",
@@ -360,10 +360,25 @@ function TabPayments({ payments, loading, onRefresh }) {
                           </div>
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontFamily: "var(--font-display)", fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>{rupee(p.amount)}</div>
-                          <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: sc.bg, color: sc.c, marginTop: "3px", display: "inline-block" }}>
-                            {p.status}
-                          </span>
+                          {/* Total Amount */}
+                          <div style={{ fontFamily: "var(--font-display)", fontSize: "14px", fontWeight: 800, color: "var(--text-primary)" }}>
+                            {rupee(p.amount)}
+                          </div>
+                          {/* Paid / Due breakdown */}
+                          {Number(p.due_amount) > 0 ? (
+                            <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                              <span style={{ fontSize: "10px", color: "var(--green)", fontWeight: 600 }}>
+                                ✓ Paid: {rupee(p.paid_amount)}
+                              </span>
+                              <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 6px", borderRadius: "99px", background: "var(--yellow-bg)", color: "var(--yellow)", border: "1px solid rgba(251,191,36,0.3)" }}>
+                                ⏳ Due: {rupee(p.due_amount)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: sc.bg, color: sc.c, marginTop: "3px", display: "inline-block" }}>
+                              {p.status === "paid" ? "✓ paid" : p.status}
+                            </span>
+                          )}
                         </div>
                       </div>
                       {/* Mark Complete button for pending */}
@@ -381,7 +396,7 @@ function TabPayments({ payments, loading, onRefresh }) {
                             }}
                           >
                             <FaCheck style={{ fontSize: "9px" }} />
-                            {markingId === p.id ? "Marking..." : `Mark Complete — ${rupee(p.amount)}`}
+                            {markingId === p.id ? "Marking..." : `Pay Due ${rupee(p.due_amount || p.amount)} → Mark Paid`}
                           </button>
                         </div>
                       )}
@@ -688,7 +703,7 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
             <TabPlanHistory planHistory={planHistory} loading={loading} />
           )}
           {activeTab === "payments" && (
-            <TabPayments payments={payments} loading={loading} />
+            <TabPayments payments={payments} loading={loading} onRefresh={fetchAll} />
           )}
           {activeTab === "attend" && (
             <TabAttendance

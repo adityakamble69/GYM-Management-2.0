@@ -98,16 +98,26 @@ router.get("/drilldown/years", verifyToken, (req, res) => {
 });
 
 // ── DRILL DOWN: Months of a year ─────────────────────────────────────────────
+// FIX: DATE_FORMAT removed — causes Error 1055 in MySQL strict mode
+// month_name now derived in JS
 router.get("/drilldown/months/:year", verifyToken, (req, res) => {
+    const MONTH_NAMES = ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     db.query(
-        `SELECT MONTH(payment_date) AS month, DATE_FORMAT(payment_date,'%b') AS month_name,
-                COALESCE(SUM(amount),0) AS total, COUNT(*) AS count
-         FROM payments WHERE status='paid' AND YEAR(payment_date)=?
-         GROUP BY MONTH(payment_date) ORDER BY month ASC`,
+        `SELECT MONTH(payment_date) AS month,
+                COALESCE(SUM(amount),0) AS total,
+                COUNT(*) AS count
+         FROM payments
+         WHERE status='paid' AND YEAR(payment_date)=?
+         GROUP BY MONTH(payment_date)
+         ORDER BY month ASC`,
         [req.params.year],
         (err, rows) => {
-            if (err) return res.status(500).json({ success: false, message: "DB Error" });
-            res.json({ success: true, data: rows });
+            if (err) {
+                console.error("DRILLDOWN MONTHS ERROR:", err.message);
+                return res.status(500).json({ success: false, message: "DB Error: " + err.message });
+            }
+            const data = rows.map(r => ({ ...r, month_name: MONTH_NAMES[r.month] || String(r.month) }));
+            res.json({ success: true, data });
         }
     );
 });

@@ -11,12 +11,11 @@ router.get("/revenue", verifyToken, (req, res) => {
         monthly: `
             SELECT 
                 MONTH(payment_date) AS month,
-                MONTHNAME(payment_date) AS month_name,
                 SUM(amount) AS total,
                 COUNT(*) AS count
             FROM payments
             WHERE status = 'paid' AND YEAR(payment_date) = ?
-            GROUP BY MONTH(payment_date), MONTHNAME(payment_date)
+            GROUP BY MONTH(payment_date)
             ORDER BY month ASC`,
 
         yearly: `
@@ -64,11 +63,10 @@ router.get("/members", verifyToken, (req, res) => {
         monthly: `
             SELECT
                 MONTH(created_at) AS month,
-                MONTHNAME(created_at) AS month_name,
                 COUNT(*) AS new_members
             FROM members
             WHERE YEAR(created_at) = ?
-            GROUP BY MONTH(created_at), MONTHNAME(created_at)
+            GROUP BY MONTH(created_at)
             ORDER BY month ASC`,
 
         byType: `
@@ -109,24 +107,22 @@ router.get("/attendance", verifyToken, (req, res) => {
         monthly: `
             SELECT
                 MONTH(date) AS month,
-                MONTHNAME(date) AS month_name,
                 COUNT(*) AS total,
                 SUM(status = 'present') AS present,
                 SUM(status = 'absent') AS absent
             FROM attendance
             WHERE YEAR(date) = ?
-            GROUP BY MONTH(date), MONTHNAME(date)
+            GROUP BY MONTH(date)
             ORDER BY month ASC`,
 
         weekly: `
             SELECT
                 DATE(date) AS day,
-                DAYNAME(date) AS day_name,
                 COUNT(*) AS count
             FROM attendance
             WHERE date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
             AND status = 'present'
-            GROUP BY DATE(date), DAYNAME(date)
+            GROUP BY DATE(date)
             ORDER BY day ASC`,
 
         summary: `

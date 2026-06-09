@@ -15,6 +15,7 @@ import {
   FaFilePdf, FaFileExcel, FaRupeeSign,
   FaUserCheck, FaCalendarAlt
 } from "react-icons/fa";
+import ReportDrillDownModal from "../components/ReportDrillDownModal";
 
 ChartJS.register(
   CategoryScale, LinearScale, BarElement, LineElement,
@@ -109,6 +110,7 @@ export default function Reports({ onLogout }) {
   const [year,      setYear]      = useState(new Date().getFullYear());
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(true);
+  const [drillMonth, setDrillMonth] = useState(null);
 
   const years = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
 
@@ -305,11 +307,16 @@ export default function Reports({ onLogout }) {
                 const total = row?.total || 0;
                 const count = row?.count || 0;
                 return (
-                  <tr key={m} style={{ borderBottom: "1px solid var(--border-subtle)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--bg-hover)"}
+                  <tr key={m}
+                    onClick={() => count > 0 && setDrillMonth({ month: i + 1, year })}
+                    style={{ borderBottom: "1px solid var(--border-subtle)", cursor: count > 0 ? "pointer" : "default", transition: "background 0.1s" }}
+                    onMouseEnter={e => { if (count > 0) e.currentTarget.style.background = "var(--bg-elevated)"; }}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
-                    <td style={{ padding: "12px 20px", color: "var(--text-primary)", fontSize: "13px", fontWeight: 500 }}>{m}</td>
+                    <td style={{ padding: "12px 20px", fontSize: "13px", fontWeight: 500 }}>
+                      <span style={{ color: count > 0 ? "var(--text-primary)" : "var(--text-muted)" }}>{m}</span>
+                      {count > 0 && <span style={{ marginLeft: "8px", fontSize: "10px", color: "var(--blue)", opacity: 0.7 }}>→ details</span>}
+                    </td>
                     <td style={{ padding: "12px 20px", color: total > 0 ? "#34d399" : "var(--text-muted)", fontSize: "13px", fontWeight: 600 }}>
                       ₹{Number(total).toLocaleString("en-IN")}
                     </td>
@@ -514,6 +521,7 @@ export default function Reports({ onLogout }) {
   };
 
   return (
+    <>
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-base)", fontFamily: "var(--font-body)" }}>
       <Sidebar onLogout={onLogout} />
 
@@ -597,5 +605,11 @@ export default function Reports({ onLogout }) {
         </div>
       </main>
     </div>
+    <ReportDrillDownModal
+      month={drillMonth?.month}
+      year={drillMonth?.year}
+      onClose={() => setDrillMonth(null)}
+    />
+    </>
   );
 }

@@ -71,14 +71,16 @@ function DrillDownModal({ open, onClose }) {
   }, [open]);
 
   const goMonths = async (year) => {
-    setSelYear(year); setLoading(true); setSearch("");
-    try { const r = await api.get(`/payments/drilldown/months/${year}`); setMonths(r.data.data); setLevel("months"); }
+    const yr = parseInt(year);
+    setSelYear(yr); setLoading(true); setSearch("");
+    try { const r = await api.get(`/payments/drilldown/months/${yr}`); setMonths(r.data.data); setLevel("months"); }
     catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
   const goMembers = async (month) => {
-    setSelMonth(month); setLoading(true); setSearch("");
-    try { const r = await api.get(`/payments/drilldown/members/${selYear}/${month}`); setMembers(r.data.data); setLevel("members"); }
+    const mo = parseInt(month);
+    setSelMonth(mo); setLoading(true); setSearch("");
+    try { const r = await api.get(`/payments/drilldown/members/${selYear}/${mo}`); setMembers(r.data.data); setLevel("members"); }
     catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
@@ -257,12 +259,26 @@ function PendingCountModal({ open, onClose, onStatsRefresh }) {
 
   useEffect(() => { if (!open) return; setSearch(""); load(); }, [open]);
 
+  const VALID_FOR = ["monthly","quarterly","half_yearly","yearly","registration","other"];
+
   const markPaid = async (p) => {
     setMarkingId(p.id);
     try {
+      const paymentFor = VALID_FOR.includes(p.payment_for) ? p.payment_for : "other";
       await api.put(`/payments/${p.id}`, {
-        ...p, status: "paid", paid_amount: p.amount, due_amount: 0,
-        payment_date: new Date().toISOString().split("T")[0],
+        member_id:      p.member_id,
+        amount:         p.amount,
+        paid_amount:    p.amount,
+        due_amount:     0,
+        payment_date:   p.payment_date?.split("T")[0] || new Date().toISOString().split("T")[0],
+        payment_method: p.payment_method || "cash",
+        payment_for:    paymentFor,
+        status:         "paid",
+        months_covered: p.months_covered || 1,
+        notes:          p.notes          || null,
+        plan_name:      p.plan_name      || null,
+        plan_start:     p.plan_start ? p.plan_start.split("T")[0] : null,
+        plan_end:       p.plan_end   ? p.plan_end.split("T")[0]   : null,
       });
       load();
       if (onStatsRefresh) onStatsRefresh();
@@ -860,13 +876,48 @@ export default function Payments({ onLogout }) {
                           <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>{p.email}</div>
                         </td>
                         <td style={{ padding: "14px 16px" }}>
+                          {/* Total Amount */}
                           <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--text-primary)", fontSize: "14px" }}>{fmt(p.amount)}</span>
-                          {hasDue && <div style={{ marginTop: "5px" }}>
-                            <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "var(--yellow-bg)", color: "var(--yellow)", border: "1px solid rgba(234,179,8,0.3)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                              <FaExclamationTriangle style={{ fontSize: "8px" }} />Due: {fmt(p.due_amount)}
-                            </span>
-                            <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>Paid: {fmt(p.paid_amount)}</div>
-                          </div>}
+                          {hasDue ? (
+                            <div style={{ marginTop: "5px", display: "flex", flexDirection: "column", gap: "3px" }}>
+                              {/* Paid so far */}
+                              <span style={{ fontSize: "11px", color: "var(--green)", fontWeight: 600 }}>
+                                ✓ Paid: {fmt(p.paid_amount)}
+                              </span>
+                              {/* Due amount */}
+                              <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "99px", background: "var(--yellow-bg)", color: "var(--yellow)", border: "1px solid rgba(234,179,8,0.3)", display: "inline-flex", alignItems: "center", gap: "3px", width: "fit-content" }}>
+                                <FaExclamationTriangle style={{ fontSize: "8px" }} />Due: {fmt(p.due_amount)}
+                              </span>
+                              {/* Pay Due button */}
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm(`Mark ₹${Number(p.due_amount).toLocaleString("en-IN")} as paid for ${p.full_name}?`)) return;
+                                  try {
+                                    await api.put(`/payments/${p.id}`, {
+                                      ...p,
+                                      paid_amount: Number(p.amount),
+                                      due_amount:  0,
+                                      status:      "paid",
+                                      payment_date: p.payment_date?.split("T")[0] || new Date().toISOString().split("T")[0]
+                                    });
+                                    fetchPayments(); fetchStats();
+                                  } catch(e) { alert("Failed: " + (e.response?.data?.message || e.message)); }
+                                }}
+                                style={{
+                                  marginTop: "2px", padding: "3px 10px", borderRadius: "99px", cursor: "pointer",
+                                  background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)",
+                                  color: "var(--green)", fontSize: "10px", fontWeight: 700,
+                                  display: "inline-flex", alignItems: "center", gap: "4px"
+                                }}
+                              >
+                                ✓ Pay Due {fmt(p.due_amount)}
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
+                              Fully paid ✓
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: "14px 16px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{fmtDate(p.payment_date)}</td>
                         <td style={{ padding: "14px 16px" }}><span style={{ display: "flex", alignItems: "center", gap: "5px", color: "var(--text-secondary)" }}>{METHOD_ICON[p.payment_method]} {p.payment_method?.replace("_"," ")}</span></td>
