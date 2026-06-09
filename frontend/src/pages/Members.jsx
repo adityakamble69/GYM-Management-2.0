@@ -4,7 +4,7 @@ import api from "../services/api";
 import {
   FaPlus, FaSearch, FaTimes,
   FaChevronLeft, FaChevronRight, FaUsers, FaUser,
-  FaWhatsapp, FaEnvelope, FaCheck, FaPaperPlane, FaSyncAlt
+  FaWhatsapp, FaEnvelope, FaCheck, FaPaperPlane, FaSyncAlt, FaTrash
 } from "react-icons/fa";
 import MemberProfileDrawer from "../components/MemberProfileDrawer";
 
@@ -650,6 +650,7 @@ export default function Members({ onLogout }) {
   const [notifyMember, setNotifyMember] = useState(null);
   const [profileMember, setProfileMember] = useState(null);
   const [renewMember, setRenewMember] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
   const searchTimer = useRef(null);
 
   useEffect(() => { fetchMembers(1, ""); fetchPlans(); }, []);
@@ -693,6 +694,14 @@ export default function Members({ onLogout }) {
       setShowModal(false); fetchMembers(pagination.page, search);
     } catch (e) { setFormError(e.response?.data?.message || "Failed to save."); }
     finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await api.delete(`/members/${deleteId}`);
+      setDeleteId(null);
+      fetchMembers(pagination.page, search);
+    } catch (e) { console.error(e); }
   };
 
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -789,6 +798,16 @@ export default function Members({ onLogout }) {
                             >
                               <FaEnvelope style={{ fontSize: "10px" }} /> Notify
                             </button>
+                            {/* Delete */}
+                            <button
+                              onClick={() => setDeleteId(m.id)}
+                              title="Delete Member"
+                              style={{ padding: "5px 8px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-muted)", cursor: "pointer", fontSize: "11px", display: "flex", alignItems: "center", transition: "all 0.15s" }}
+                              onMouseEnter={e => { e.currentTarget.style.background = "var(--red-bg)"; e.currentTarget.style.borderColor = "rgba(248,113,113,0.4)"; e.currentTarget.style.color = "var(--red)"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "var(--bg-elevated)"; e.currentTarget.style.borderColor = "var(--border-default)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+                            >
+                              <FaTrash style={{ fontSize: "10px" }} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -883,6 +902,33 @@ export default function Members({ onLogout }) {
           onClose={() => setRenewMember(null)}
           onSuccess={() => { setRenewMember(null); fetchMembers(pagination.page, search); }}
         />
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteId && (
+        <div className="fade-in" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1400, backdropFilter: "blur(4px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setDeleteId(null); }}>
+          <div className="fade-up" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xl)", padding: "32px", maxWidth: "360px", width: "100%", textAlign: "center", boxShadow: "var(--shadow-lg)" }}>
+            <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: "var(--red)" }}>
+              <FaTrash style={{ fontSize: "18px" }} />
+            </div>
+            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "var(--text-primary)", marginBottom: "8px" }}>Delete Member?</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "13px", marginBottom: "8px" }}>
+              Yeh member permanently delete ho jayega.
+            </p>
+            <p style={{ color: "var(--red)", fontSize: "12px", marginBottom: "24px", padding: "8px 12px", background: "var(--red-bg)", borderRadius: "var(--radius-sm)", border: "1px solid rgba(248,113,113,0.2)" }}>
+              ⚠️ Saare payments aur attendance records bhi delete honge.
+            </p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={() => setDeleteId(null)} style={{ flex: 1, padding: "10px", borderRadius: "var(--radius-sm)", background: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-secondary)", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button onClick={handleDelete} style={{ flex: 1, padding: "10px", borderRadius: "var(--radius-sm)", background: "var(--red-bg)", border: "1px solid rgba(248,113,113,0.3)", color: "var(--red)", cursor: "pointer", fontSize: "13px", fontWeight: 700, fontFamily: "var(--font-display)" }}>
+                DELETE
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

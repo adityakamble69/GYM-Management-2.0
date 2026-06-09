@@ -7,26 +7,34 @@ const { inquiryAlertEmail } = require("../utils/emailTemplates");
 
 // ── PUBLIC: Submit inquiry — admin alert email trigger ────────────────────────
 router.post("/submit", (req, res) => {
-    const { full_name, email, phone, message, membership_interest, preferred_time } = req.body;
+    const { full_name, email, phone, gender, date_of_birth, address, message, membership_interest, preferred_time, photo } = req.body;
 
     if (!full_name || !email || !phone)
         return res.status(400).json({ success: false, message: "Name, email and phone are required" });
 
     const sql = `INSERT INTO inquiries
-        (full_name, email, phone, message, membership_interest, preferred_time)
-        VALUES (?, ?, ?, ?, ?, ?)`;
+        (full_name, email, phone, gender, date_of_birth, address, message, membership_interest, preferred_time, photo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     db.query(sql, [
         full_name, email, phone,
+        gender              || null,
+        date_of_birth       || null,
+        address             || null,
         message             || null,
         membership_interest || "not_sure",
-        preferred_time      || "anytime"
+        preferred_time      || "anytime",
+        photo               || null,
     ], (err, result) => {
-        if (err) return res.status(500).json({ success: false, message: "Something went wrong. Please try again." });
+        if (err) {
+            console.error("❌ Inquiry submit DB error:", err.code, err.message);
+            return res.status(500).json({ success: false, message: err.message });
+        }
 
         // ✅ Send admin alert email (non-blocking)
         sendEmail(inquiryAlertEmail({ full_name, email, phone, message, membership_interest, preferred_time }))
-          .then(r => console.log(`Inquiry alert email [${full_name}]:`, r.success ? "✅ sent" : "❌ " + r.error));
+          .then(r => console.log(`Inquiry alert email [${full_name}]:`, r.success ? "✅ sent" : "❌ " + r.error))
+          .catch(e => console.error("❌ sendEmail crash:", e.message));
 
         res.status(201).json({ success: true, message: "Thank you! We will contact you soon." });
     });

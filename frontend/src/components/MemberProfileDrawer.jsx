@@ -7,7 +7,7 @@ import {
   FaBirthdayCake, FaVenusMars, FaCalendarAlt, FaHistory,
   FaEdit, FaMoneyBill, FaClipboardCheck, FaChevronDown,
   FaChevronUp, FaCrown, FaRupeeSign, FaIdCard, FaLayerGroup,
-  FaWallet, FaRunning
+  FaWallet, FaRunning, FaCheck, FaExclamationTriangle
 } from "react-icons/fa";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -252,8 +252,8 @@ function TabPayments({ payments, loading, onRefresh }) {
   const [filter,     setFilter]     = useState("all");
   const [markingId,  setMarkingId]  = useState(null);
 
-  const totalPaid  = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-  const pendingAmt = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaid  = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.paid_amount || p.amount), 0);
+  const pendingAmt = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.due_amount || p.amount), 0);
   const filtered   = filter === "all" ? payments : payments.filter(p => p.status === filter);
 
   const payByMonth = filtered.reduce((acc, p) => {
@@ -267,11 +267,19 @@ function TabPayments({ payments, loading, onRefresh }) {
     setMarkingId(p.id);
     try {
       await api.put(`/payments/${p.id}`, {
-        ...p,
-        status:         "paid",
-        paid_amount:    p.amount,
+        member_id:      p.member_id,
+        amount:         Number(p.amount),
+        paid_amount:    Number(p.amount),
         due_amount:     0,
         payment_date:   new Date().toISOString().split("T")[0],
+        payment_method: p.payment_method || "cash",
+        payment_for:    p.payment_for    || "monthly",
+        status:         "paid",
+        months_covered: Number(p.months_covered) || 1,
+        notes:          p.notes      || null,
+        plan_name:      p.plan_name  || null,
+        plan_start:     p.plan_start ? p.plan_start.split("T")[0] : null,
+        plan_end:       p.plan_end   ? p.plan_end.split("T")[0]   : null,
       });
       onRefresh();
     } catch (e) { console.error(e); }
@@ -529,8 +537,8 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
 
   const days         = daysLeft(member.membership_end);
   const initials     = member.full_name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
-  const totalPaid    = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-  const pendingAmt   = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaid    = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.paid_amount || p.amount), 0);
+  const pendingAmt   = payments.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.due_amount || p.amount), 0);
   const thisMonthAtt = attendance.filter(a => {
     const d = new Date(a.date), n = new Date();
     return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
@@ -600,8 +608,12 @@ export default function MemberProfileDrawer({ member, onClose, onEdit, onRecordP
                 background: "var(--bg-active)", border: "2px solid var(--border-strong)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: 800,
-                color: "var(--text-primary)", flexShrink: 0
-              }}>{initials}</div>
+                color: "var(--text-primary)", flexShrink: 0, overflow: "hidden"
+              }}>
+                {member.photo
+                  ? <img src={member.photo} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                  : initials}
+              </div>
               <div>
                 <div style={{ fontFamily: "var(--font-display)", fontSize: "17px", fontWeight: 800, color: "var(--text-primary)", marginBottom: "5px" }}>
                   {member.full_name}
