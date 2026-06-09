@@ -6,93 +6,153 @@ const { verifyToken } = require("../middleware/authMiddleware");
 // ── REVENUE REPORT ────────────────────────────────────────────────────────────
 router.get("/revenue", verifyToken, (req, res) => {
     const year = req.query.year || new Date().getFullYear();
-
     const queries = {
         monthly: `
-            SELECT 
-                MONTH(payment_date) AS month,
-                SUM(amount) AS total,
-                COUNT(*) AS count
-            FROM payments
-            WHERE status = 'paid' AND YEAR(payment_date) = ?
-            GROUP BY MONTH(payment_date)
-            ORDER BY month ASC`,
-
+            SELECT MONTH(payment_date) AS month, SUM(amount) AS total, COUNT(*) AS count
+            FROM payments WHERE status = 'paid' AND YEAR(payment_date) = ?
+            GROUP BY MONTH(payment_date) ORDER BY month ASC`,
         yearly: `
-            SELECT 
-                YEAR(payment_date) AS year,
-                SUM(amount) AS total,
-                COUNT(*) AS count
-            FROM payments
-            WHERE status = 'paid'
-            GROUP BY YEAR(payment_date)
-            ORDER BY year ASC`,
-
+            SELECT YEAR(payment_date) AS year, SUM(amount) AS total, COUNT(*) AS count
+            FROM payments WHERE status = 'paid'
+            GROUP BY YEAR(payment_date) ORDER BY year ASC`,
         summary: `
             SELECT
-                COALESCE(SUM(CASE WHEN YEAR(payment_date) = ? AND status='paid' THEN amount END), 0) AS this_year,
-                COALESCE(SUM(CASE WHEN YEAR(payment_date) = ?-1 AND status='paid' THEN amount END), 0) AS last_year,
-                COALESCE(SUM(CASE WHEN MONTH(payment_date) = MONTH(CURDATE()) AND YEAR(payment_date) = YEAR(CURDATE()) AND status='paid' THEN amount END), 0) AS this_month,
-                COALESCE(SUM(CASE WHEN status='paid' THEN amount END), 0) AS all_time,
+                COALESCE(SUM(CASE WHEN YEAR(payment_date)=? AND status='paid' THEN amount END),0) AS this_year,
+                COALESCE(SUM(CASE WHEN YEAR(payment_date)=?-1 AND status='paid' THEN amount END),0) AS last_year,
+                COALESCE(SUM(CASE WHEN MONTH(payment_date)=MONTH(CURDATE()) AND YEAR(payment_date)=YEAR(CURDATE()) AND status='paid' THEN amount END),0) AS this_month,
+                COALESCE(SUM(CASE WHEN status='paid' THEN amount END),0) AS all_time,
                 COUNT(CASE WHEN status='pending' THEN 1 END) AS pending_count,
-                COALESCE(SUM(CASE WHEN status='pending' THEN amount END), 0) AS pending_amount
+                COALESCE(SUM(CASE WHEN status='pending' THEN amount END),0) AS pending_amount
             FROM payments`,
-
         byMethod: `
             SELECT payment_method, COUNT(*) AS count, SUM(amount) AS total
-            FROM payments WHERE status = 'paid' AND YEAR(payment_date) = ?
+            FROM payments WHERE status='paid' AND YEAR(payment_date)=?
             GROUP BY payment_method`,
     };
-
     const results = {};
     let pending = Object.keys(queries).length;
-
     const done = () => { if (--pending === 0) res.json({ success: true, data: results }); };
+    db.query(queries.monthly,  [year],       (err, rows) => { if (!err) results.monthly  = rows; done(); });
+    db.query(queries.yearly,   [],           (err, rows) => { if (!err) results.yearly   = rows; done(); });
+    db.query(queries.summary,  [year, year], (err, rows) => { if (!err) results.summary  = rows[0]; done(); });
+    db.query(queries.byMethod, [year],       (err, rows) => { if (!err) results.byMethod = rows; done(); });
+});
 
-    db.query(queries.monthly, [year], (err, rows) => { if (!err) results.monthly = rows; done(); });
-    db.query(queries.yearly,  [],     (err, rows) => { if (!err) results.yearly  = rows; done(); });
-    db.query(queries.summary, [year, year], (err, rows) => { if (!err) results.summary = rows[0]; done(); });
-    db.query(queries.byMethod,[year], (err, rows) => { if (!err) results.byMethod = rows; done(); });
+// ── DRILLDOWN: Year → Months (for Last Year / All Time year click) ────────────
+router.get("/drilldown/year/:year", verifyToken, (req, res) => {
+    const { year } = req.params;
+    db.query(`
+        SELECT
+            MONTH(payment_date) AS month,
+            SUM(amount)         AS total,
+            SUM(paid_amount)    AS paid,
+            SUM(due_amount)     AS due,
+            COUNT(*)            AS count
+        FROM payments
+        WHERE YEAR(payment_date) = ?
+        GROUP BY MONTH(payment_date)
+        ORDER BY month ASC`,
+        [year],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows, year: Number(year) });
+        }
+    );
+});
+
+// ── DRILLDOWN: All Years list ─────────────────────────────────────────────────
+router.get("/drilldown/all-years", verifyToken, (req, res) => {
+    db.query(`
+        SELECT
+            YEAR(payment_date)  AS year,
+            SUM(amount)         AS total,
+            SUM(paid_amount)    AS paid,
+            SUM(due_amount)     AS due,
+            COUNT(*)            AS count
+        FROM payments
+        GROUP BY YEAR(payment_date)
+        ORDER BY year DESC`,
+        [],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows });
+        }
+    );
+});
+
+// ── DRILLDOWN: Month → Members who paid ──────────────────────────────────────
+router.get("/drilldown/members/:year/:month", verifyToken, (req, res) => {
+    const { year, month } = req.params;
+    db.query(`
+        SELECT p.*, m.full_name, m.phone, m.email, m.membership_type
+        FROM payments p
+        JOIN members m ON p.member_id = m.id
+        WHERE YEAR(p.payment_date) = ? AND MONTH(p.payment_date) = ?
+        ORDER BY p.payment_date DESC`,
+        [year, month],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows });
+        }
+    );
+});
+
+// ── DRILLDOWN: This Month members ────────────────────────────────────────────
+router.get("/drilldown/this-month", verifyToken, (req, res) => {
+    db.query(`
+        SELECT p.*, m.full_name, m.phone, m.email, m.membership_type
+        FROM payments p
+        JOIN members m ON p.member_id = m.id
+        WHERE MONTH(p.payment_date) = MONTH(CURDATE())
+          AND YEAR(p.payment_date)  = YEAR(CURDATE())
+        ORDER BY p.payment_date DESC`,
+        [],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows });
+        }
+    );
+});
+
+// ── DRILLDOWN: Payment method → Members ──────────────────────────────────────
+router.get("/drilldown/method/:method", verifyToken, (req, res) => {
+    const { method } = req.params;
+    const year = req.query.year || new Date().getFullYear();
+    db.query(`
+        SELECT p.*, m.full_name, m.phone, m.email, m.membership_type
+        FROM payments p
+        JOIN members m ON p.member_id = m.id
+        WHERE p.payment_method = ?
+          AND YEAR(p.payment_date) = ?
+          AND p.status = 'paid'
+        ORDER BY p.payment_date DESC`,
+        [method, year],
+        (err, rows) => {
+            if (err) return res.status(500).json({ success: false, message: err.message });
+            res.json({ success: true, data: rows, method, year: Number(year) });
+        }
+    );
 });
 
 // ── MEMBER GROWTH REPORT ──────────────────────────────────────────────────────
 router.get("/members", verifyToken, (req, res) => {
     const year = req.query.year || new Date().getFullYear();
-
     const queries = {
         monthly: `
-            SELECT
-                MONTH(created_at) AS month,
-                COUNT(*) AS new_members
-            FROM members
-            WHERE YEAR(created_at) = ?
-            GROUP BY MONTH(created_at)
-            ORDER BY month ASC`,
-
-        byType: `
-            SELECT membership_type, COUNT(*) AS count
-            FROM members
-            GROUP BY membership_type`,
-
-        byStatus: `
-            SELECT status, COUNT(*) AS count
-            FROM members
-            GROUP BY status`,
-
+            SELECT MONTH(created_at) AS month, COUNT(*) AS new_members
+            FROM members WHERE YEAR(created_at)=?
+            GROUP BY MONTH(created_at) ORDER BY month ASC`,
+        byType:   `SELECT membership_type, COUNT(*) AS count FROM members GROUP BY membership_type`,
+        byStatus: `SELECT status, COUNT(*) AS count FROM members GROUP BY status`,
         summary: `
-            SELECT
-                COUNT(*) AS total,
-                SUM(status = 'active') AS active,
-                SUM(status = 'inactive') AS inactive,
-                SUM(status = 'expired') AS expired,
-                COUNT(CASE WHEN MONTH(created_at) = MONTH(CURDATE()) AND YEAR(created_at) = YEAR(CURDATE()) THEN 1 END) AS this_month
+            SELECT COUNT(*) AS total,
+                SUM(status='active') AS active, SUM(status='inactive') AS inactive, SUM(status='expired') AS expired,
+                COUNT(CASE WHEN MONTH(created_at)=MONTH(CURDATE()) AND YEAR(created_at)=YEAR(CURDATE()) THEN 1 END) AS this_month
             FROM members`,
     };
-
     const results = {};
     let pending = Object.keys(queries).length;
     const done = () => { if (--pending === 0) res.json({ success: true, data: results }); };
-
     db.query(queries.monthly,  [year], (err, rows) => { if (!err) results.monthly  = rows; done(); });
     db.query(queries.byType,   [],     (err, rows) => { if (!err) results.byType   = rows; done(); });
     db.query(queries.byStatus, [],     (err, rows) => { if (!err) results.byStatus = rows; done(); });
@@ -102,51 +162,32 @@ router.get("/members", verifyToken, (req, res) => {
 // ── ATTENDANCE REPORT ─────────────────────────────────────────────────────────
 router.get("/attendance", verifyToken, (req, res) => {
     const year = req.query.year || new Date().getFullYear();
-
     const queries = {
         monthly: `
-            SELECT
-                MONTH(date) AS month,
-                COUNT(*) AS total,
-                SUM(status = 'present') AS present,
-                SUM(status = 'absent') AS absent
-            FROM attendance
-            WHERE YEAR(date) = ?
-            GROUP BY MONTH(date)
-            ORDER BY month ASC`,
-
+            SELECT MONTH(date) AS month, COUNT(*) AS total,
+                SUM(status='present') AS present, SUM(status='absent') AS absent
+            FROM attendance WHERE YEAR(date)=?
+            GROUP BY MONTH(date) ORDER BY month ASC`,
         weekly: `
-            SELECT
-                DATE(date) AS day,
-                COUNT(*) AS count
+            SELECT DATE(date) AS day, COUNT(*) AS count
             FROM attendance
-            WHERE date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
-            AND status = 'present'
-            GROUP BY DATE(date)
-            ORDER BY day ASC`,
-
+            WHERE date >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) AND status='present'
+            GROUP BY DATE(date) ORDER BY day ASC`,
         summary: `
-            SELECT
-                COUNT(*) AS total,
-                SUM(status = 'present') AS present,
-                COUNT(CASE WHEN date = CURDATE() THEN 1 END) AS today,
-                COUNT(CASE WHEN MONTH(date) = MONTH(CURDATE()) AND YEAR(date) = YEAR(CURDATE()) THEN 1 END) AS this_month
+            SELECT COUNT(*) AS total, SUM(status='present') AS present,
+                COUNT(CASE WHEN date=CURDATE() THEN 1 END) AS today,
+                COUNT(CASE WHEN MONTH(date)=MONTH(CURDATE()) AND YEAR(date)=YEAR(CURDATE()) THEN 1 END) AS this_month
             FROM attendance`,
-
         topMembers: `
             SELECT m.full_name, m.membership_type, COUNT(a.id) AS visits
-            FROM attendance a
-            JOIN members m ON a.member_id = m.id
-            WHERE a.status = 'present' AND YEAR(a.date) = ?
+            FROM attendance a JOIN members m ON a.member_id=m.id
+            WHERE a.status='present' AND YEAR(a.date)=?
             GROUP BY a.member_id, m.full_name, m.membership_type
-            ORDER BY visits DESC
-            LIMIT 5`,
+            ORDER BY visits DESC LIMIT 5`,
     };
-
     const results = {};
     let pending = Object.keys(queries).length;
     const done = () => { if (--pending === 0) res.json({ success: true, data: results }); };
-
     db.query(queries.monthly,    [year], (err, rows) => { if (!err) results.monthly    = rows; done(); });
     db.query(queries.weekly,     [],     (err, rows) => { if (!err) results.weekly     = rows; done(); });
     db.query(queries.summary,    [],     (err, rows) => { if (!err) results.summary    = rows[0]; done(); });
